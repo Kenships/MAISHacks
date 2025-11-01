@@ -1,16 +1,26 @@
 import tkinter as tk
-import numpy as np
-import cv2 as cv
+from pynput.keyboard import Key, Controller
+import cv2  # OpenCV
+from PIL import Image, ImageTk  # Pillow
+import sys
+import time
 
-cap = cv.VideoCapture(0)
+class HandGestureApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("App GUI")
+        self.root.geometry("500x600")
 
-while True:
-    ret, frame = cap.read()
-    cv.imshow('Webcam Feed', frame)
-    if cv.waitKey(1) & 0xFF == ord('q'):
-        break
+        title = tk.Label(text="AI Layout")
+        title.pack()
 
-cap.release()
-cv.destroyAllWindows()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = HandGestureApp(root)
+    root.mainloop()
+
+
+
 
 

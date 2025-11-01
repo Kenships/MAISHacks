@@ -2,6 +2,8 @@ import tkinter as tk
 import cv2  # OpenCV
 from PIL import Image, ImageTk  # Pillow
 import sys
+from customtkinter import *
+
 
 class HandGestureApp:
     def __init__(self, root):
@@ -62,7 +64,6 @@ class HandGestureApp:
                                       bg="#cc0000", activebackground="#aa0000", **button_config)
         # .grid() is called in start_camera()
 
-        # THIS IS THE BUTTON YOU ASKED FOR
         self.toggle_view_btn = tk.Button(self.controls_frame, 
                                          text="🙈 Hide Feed", 
                                          command=self.toggle_camera_view,
@@ -77,7 +78,7 @@ class HandGestureApp:
         self.simulate_btn.grid(row=0, column=1, padx=5)
         
         self.status_label = tk.Label(self.bottom_frame, text="Ready",
-                                     font=("Arial", 10), 
+                                     font=("Times New Roman", 10), 
                                      bg="#282828", fg="#00ff00")
         self.status_label.pack(pady=(0, 10))
 
@@ -199,7 +200,7 @@ class HandGestureApp:
         self.root.destroy()
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = CTk()
     app = HandGestureApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
