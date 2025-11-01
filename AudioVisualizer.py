@@ -48,7 +48,10 @@ def band_reduce(sdb, bands):
     return np.array(vals)
 
 # ====== Capture device ======
-speaker = sc.default_speaker()  # WASAPI loopback via soundcard
+# Get the default speaker's loopback recorder
+speaker = sc.default_speaker()
+# Use get_microphone with include_loopback=True to get loopback device
+loopback = sc.get_microphone(speaker.id, include_loopback=True)
 
 # Precompute band mapping for plotting
 bands, freqs = logspace_bands(N_BANDS, F_MIN, F_MAX, FS, CHUNK)
@@ -64,6 +67,7 @@ ax1.set_xlim(-0.5, N_BANDS-0.5)
 ax1.set_ylabel("dBFS")
 ax1.set_title("System Audio Visualizer (Spectrum + Volume)")
 ax1.set_xticks(range(N_BANDS))
+
 # show band center labels (roughly)
 labels = []
 for f in band_centers:
@@ -81,35 +85,41 @@ vu_text = ax1.text(0.99, 0.9, "VU: -- dBFS", transform=ax1.transAxes,
 smooth_bands = np.full(N_BANDS, -100.0)
 
 # ====== Main loop ======
-with speaker.recorder(samplerate=FS, channels=2) as rec:
+with loopback.recorder(samplerate=FS) as rec:
     # Warm-up read to prime buffers
     _ = rec.record(numframes=CHUNK)
+    
     while plt.fignum_exists(fig.number):
-        block = rec.record(numframes=CHUNK)  # shape: (CHUNK, 2)
-        mono = np.mean(block, axis=1).astype(np.float32)
-
+        block = rec.record(numframes=CHUNK)
+        
+        # Handle mono or stereo
+        if len(block.shape) == 1:
+            mono = block.astype(np.float32)
+        else:
+            mono = np.mean(block, axis=1).astype(np.float32)
+        
         # Volume (RMS dBFS)
         vol_db = dbfs(mono)
-
+        
         # Spectrum
         sdb = spectrum_db(mono, FS)
         band_vals = band_reduce(sdb, bands)
-
+        
         # Normalize visual range a bit (optional gentle compression)
         band_vals = np.clip(band_vals, -100, 0)
-        # Optional “anchoring” relative to a reference
+        
+        # Optional "anchoring" relative to a reference
         band_vals = np.clip(band_vals - (REF_DBFS - vol_db), -100, 0)
-
+        
         # Smooth
         smooth_bands = SMOOTH * smooth_bands + (1 - SMOOTH) * band_vals
-
+        
         # Update bars
         for bar, h in zip(bars, smooth_bands):
             bar.set_height(h)
-
+        
         # Update VU text
         vu_text.set_text(f"VU: {vol_db:6.1f} dBFS")
-
+        
         plt.pause(0.001)  # yield to UI
-        # Avoid tight loop if plot is closed
         time.sleep(0.001)
