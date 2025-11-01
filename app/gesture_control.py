@@ -113,7 +113,7 @@ class GestureController:
             
             # Handle gesture commands with cooldown
             current_time = time.time()
-            if detected_gesture and (current_time - self.last_gesture_time) > self.gesture_cooldown:
+            if detected_gesture and (detected_gesture != self.last_gesture or current_time - self.last_gesture_time > self.gesture_cooldown):
                 # if detected_gesture != self.last_gesture:
                 self.callback('gesture', detected_gesture, confidence)
                 self.last_gesture = detected_gesture
