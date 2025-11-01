@@ -5,9 +5,14 @@ import numpy as np
 import cv2
 from PIL import Image, ImageTk
 from gesture_control import GestureController
+from spotify_controller import auth_spotify, pause, playpause, next_track, previous_track, increase_volume, \
+    decrease_volume
+
 
 class YouTubeMusicController:
     def __init__(self, root):
+        self.sp = auth_spotify()
+
         self.root = root
         self.root.title("YouTube Music Controller with Gestures")
         self.root.geometry("640x800")
@@ -201,30 +206,35 @@ class YouTubeMusicController:
         self.root.after(2000, lambda: self.status_label.config(text="Ready"))
     
     def play_pause(self):
-        self.keyboard.press(Key.media_play_pause)
-        self.keyboard.release(Key.media_play_pause)
-        print("press pause")
-        self.show_status("⏯ Play/Pause toggled")
+        playpause(self.sp)
+        # self.keyboard.press(Key.media_play_pause)
+        # self.keyboard.release(Key.media_play_pause)
+        # print("press pause")
+        # self.show_status("⏯ Play/Pause toggled")
     
     def next_track(self):
-        self.keyboard.press(Key.media_next)
-        self.keyboard.release(Key.media_next)
-        self.show_status("⏭ Skipped to next track")
+        next_track(self.sp)
+        # self.keyboard.press(Key.media_next)
+        # self.keyboard.release(Key.media_next)
+        # self.show_status("⏭ Skipped to next track")
     
     def previous_track(self):
-        self.keyboard.press(Key.media_previous)
-        self.keyboard.release(Key.media_previous)
-        self.show_status("⏮ Previous track")
+        previous_track(self.sp)
+        # self.keyboard.press(Key.media_previous)
+        # self.keyboard.release(Key.media_previous)
+        # self.show_status("⏮ Previous track")
     
     def volume_up(self):
-        self.keyboard.press(Key.media_volume_up)
-        self.keyboard.release(Key.media_volume_up)
-        self.show_status("🔊 Volume increased")
+        increase_volume(self.sp)
+        # self.keyboard.press(Key.media_volume_up)
+        # self.keyboard.release(Key.media_volume_up)
+        # self.show_status("🔊 Volume increased")
     
     def volume_down(self):
-        self.keyboard.press(Key.media_volume_down)
-        self.keyboard.release(Key.media_volume_down)
-        self.show_status("🔉 Volume decreased")
+        decrease_volume(self.sp)
+        # self.keyboard.press(Key.media_volume_down)
+        # self.keyboard.release(Key.media_volume_down)
+        # self.show_status("🔉 Volume decreased")
     
     def on_closing(self):
         if self.is_gesture_active:

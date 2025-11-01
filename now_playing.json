@@ -1,0 +1,72 @@
+{
+  "track": {
+    "id": "7795WJLVKJoAyVoOtCWqXN",
+    "uri": "spotify:track:7795WJLVKJoAyVoOtCWqXN",
+    "name": "I'm Not The Only One",
+    "artists": [
+      {
+        "name": "Sam Smith",
+        "id": "2wY79sveU1sp5g7SokKOiI",
+        "uri": "spotify:artist:2wY79sveU1sp5g7SokKOiI"
+      }
+    ],
+    "album": {
+      "name": "In The Lonely Hour",
+      "id": "08jWgM4vSkTose4blKBWov",
+      "uri": "spotify:album:08jWgM4vSkTose4blKBWov",
+      "release_date": "2014-05-26",
+      "images": [
+        {
+          "height": 640,
+          "url": "https://i.scdn.co/image/ab67616d0000b273b11bdc91cb9ac6b14f5c1dae",
+          "width": 640
+        },
+        {
+          "height": 300,
+          "url": "https://i.scdn.co/image/ab67616d00001e02b11bdc91cb9ac6b14f5c1dae",
+          "width": 300
+        },
+        {
+          "height": 64,
+          "url": "https://i.scdn.co/image/ab67616d00004851b11bdc91cb9ac6b14f5c1dae",
+          "width": 64
+        }
+      ]
+    },
+    "duration_ms": 239316,
+    "explicit": false,
+    "popularity": 85,
+    "external_urls": {
+      "spotify": "https://open.spotify.com/track/7795WJLVKJoAyVoOtCWqXN"
+    },
+    "preview_url": null,
+    "track_number": 5,
+    "disc_number": 1
+  },
+  "playback": {
+    "is_playing": false,
+    "progress_ms": 190373,
+    "progress": "3:10",
+    "duration": "3:59",
+    "shuffle_state": true,
+    "repeat_state": "context",
+    "timestamp": 1762032053640,
+    "device": {
+      "id": "af742ab57d1ef8fb219c3af3f7937a7f7297070d",
+      "name": "KENASUS",
+      "type": "Computer",
+      "volume_percent": 100,
+      "is_active": true,
+      "is_private_session": false,
+      "supports_volume": true
+    },
+    "context": {
+      "type": "playlist",
+      "uri": "spotify:playlist:7f9O2GFOIyETLCgnJpjkBR",
+      "href": "https://api.spotify.com/v1/playlists/7f9O2GFOIyETLCgnJpjkBR",
+      "external_urls": {
+        "spotify": "https://open.spotify.com/playlist/7f9O2GFOIyETLCgnJpjkBR"
+      }
+    }
+  }
+}

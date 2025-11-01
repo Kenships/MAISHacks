@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+HEIGHT_MODIFIER = 10
+
 # Get loopback device for system audio
 default_speaker = sc.default_speaker()
 try:
@@ -46,7 +48,7 @@ def update(frame):
     
     # Update bar heights
     for bar, height in zip(bars, amplitudes):
-        bar.set_height(height)
+        bar.set_height(height*HEIGHT_MODIFIER)
     
     return bars
 
