@@ -37,7 +37,7 @@ class AudioAnalyzer:
         
         # If no loopback found, use default input
         if device_index is None:
-            device_index = self.audio.get_default_input_device_info()['index']
+            device_index = self.audio.get_default_output_device_info()['index']
         
         self.stream = self.audio.open(
             format=self.FORMAT,
