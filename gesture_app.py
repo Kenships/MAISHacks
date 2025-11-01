@@ -3,7 +3,11 @@ import cv2  # OpenCV
 from PIL import Image, ImageTk  # Pillow
 import sys
 from customtkinter import *
+from media_info import MediaInfo
 
+media_object = MediaInfo()
+attributes = media_object._get_info()
+print(attributes)
 
 class HandGestureApp:
     def __init__(self, root):
@@ -35,10 +39,15 @@ class HandGestureApp:
         self.bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, ipady=10)
 
         # --- Song Info ---
-        self.song_title_label = tk.Label(self.bottom_frame, text="No Song Playing",
+
+        # GET SONG INFO
+
+        self.song_title_label = tk.Label(self.bottom_frame, text="",
                                           font=("Arial", 16, "bold"), 
                                           bg="#282828", fg="#ffffff")
         self.song_title_label.pack(pady=(10, 0))
+
+        #
 
         self.artist_label = tk.Label(self.bottom_frame, text="---",
                                       font=("Arial", 12), 
