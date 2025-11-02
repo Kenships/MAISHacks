@@ -15,6 +15,7 @@ class HandGestureApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gesture Control Media Player")
+        # --- Smaller window to fit new elements ---
         self.root.geometry("800x700")
         self.root.configure(bg="#181818")
 
@@ -24,6 +25,7 @@ class HandGestureApp:
         self.camera_on = False
         self.camera_visible = False
         self.cap = None
+        # --- Smaller camera feed ---
         self.CAM_WIDTH = 640
         self.CAM_HEIGHT = 480
 
@@ -38,7 +40,7 @@ class HandGestureApp:
         self.camera_frame.pack(pady=20, padx=20)
         self.camera_frame.pack_propagate(False)
 
-        # Two-label approach for camera area
+        # --- Two-Label Fix ---
         self.camera_feed_label = tk.Label(self.camera_frame, bg="black")
         self.camera_placeholder_label = tk.Label(self.camera_frame, text="",
                                                  font=("Arial", 12),
@@ -56,44 +58,45 @@ class HandGestureApp:
         self.bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, ipady=10, padx=10, pady=10)
 
         media_info_frame = tk.Frame(self.bottom_frame, bg="#282828")
-        media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X)
+        media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X) # <-- Re-added fill=tk.X
 
-        # Placeholder album art
-        pil_placeholder = PILImage.new("RGB", (100, 100), color="#282828")
+        # --- Larger placeholder ---
+        pil_placeholder = Image.new("RGB", (120, 120), color="#282828")
         self.placeholder_img = ImageTk.PhotoImage(pil_placeholder)
 
         self.album_art_label = tk.Label(media_info_frame, image=self.placeholder_img,
-                                        bg="#282828", bd=0)
-        self.album_art_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.album_art_label.image = self.placeholder_img
+                                         bg="#282828", bd=0)
+        self.album_art_label.pack(side=tk.LEFT, padx=(0, 10)) # <-- Re-added side=tk.LEFT
+        self.album_art_label.image = self.placeholder_img # Anchor the placeholder
 
         # Text info
         text_info_frame = tk.Frame(media_info_frame, bg="#282828")
-        text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5) # <-- Re-added side=tk.LEFT
 
         self.song_title_label = tk.Label(text_info_frame, text="No Song Playing",
-                                         font=("Arial", 16, "bold"),
-                                         bg="#282828", fg="#ffffff", anchor="w")
-        self.song_title_label.pack(fill=tk.X)
+                                             font=("Arial", 16, "bold"), 
+                                             bg="#282828", fg="#ffffff", anchor="w") # <-- Re-added anchor="w"
+        self.song_title_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
 
         self.artist_label = tk.Label(text_info_frame, text="---",
-                                     font=("Arial", 12),
-                                     bg="#282828", fg="#aaaaaa", anchor="w")
-        self.artist_label.pack(fill=tk.X)
+                                         font=("Arial", 12), 
+                                         bg="#282828", fg="#aaaaaa", anchor="w") # <-- Re-added anchor="w"
+        self.artist_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
 
         # Controls
         self.controls_frame = tk.Frame(self.bottom_frame, bg="#282828")
         self.controls_frame.pack(pady=10)
 
+        # --- Bigger buttons/font ---
         button_config = {
-            "font": ("Arial", 11, "bold"),
-            "fg": "white",
-            "bd": 0,
+            "font": ("Arial", 12, "bold"), 
+            "fg": "white", 
+            "bd": 0, 
             "cursor": "hand2",
             "image": self.pixel_img,
-            "width": 180,
-            "height": 35,
-            "compound": "c",
+            "width": 180, 
+            "height": 40,
+            "compound": "c"
         }
 
         self.start_cam_btn = tk.Button(self.controls_frame,
@@ -148,13 +151,11 @@ class HandGestureApp:
 
             self.camera_on = True
             self.camera_visible = True
-
-            # Show video label, hide placeholder
+            
             self.camera_placeholder_label.pack_forget()
             self.camera_feed_label.pack(expand=True)
 
-            # Buttons
-            self.start_cam_btn.grid_forget()
+            self.start_cam_btn.grid_forget() 
             self.simulate_btn.grid(row=0, column=2, padx=5)
             self.stop_cam_btn.grid(row=0, column=0, padx=5)
             self.toggle_view_btn.grid(row=0, column=1, padx=5)
@@ -229,16 +230,19 @@ class HandGestureApp:
         ret, frame = self.cap.read()
 
         if ret and self.camera_visible:
-            frame_flipped = cv2.flip(frame, 1)
-            cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
-            pil_img = Image.fromarray(cv_rgb)
-            img_tk = ImageTk.PhotoImage(image=pil_img)
-            self.camera_feed_label.config(image=img_tk, text="")
-            self.camera_feed_label.image = img_tk
+            if self.camera_visible:
+                # --- Resize frame to fit new CAM_WIDTH/HEIGHT ---
+                frame = cv2.resize(frame, (self.CAM_WIDTH, self.CAM_HEIGHT))
+                frame_flipped = cv2.flip(frame, 1)
+                cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
+                
+                pil_img = Image.fromarray(cv_rgb)
+                img_tk = ImageTk.PhotoImage(image=pil_img)
+                self.camera_feed_label.config(image=img_tk, text="")
+                self.camera_feed_label.image = img_tk 
 
-        self.root.after(10, self.update_camera_feed)
+        self.root.after(10, self.update_camera_feed)  # Loop
 
-    # ---------- Gestures / status ----------
     def on_hand_symbol_detected(self, gesture):
         self.show_status(f"Gesture Detected: {gesture}")
         self.artist_label.config(text=f"Last Gesture: {gesture}")
@@ -290,27 +294,39 @@ class HandGestureApp:
             self.song_title_label.config(text="No Media Playing")
             self.artist_label.config(text="---")
 
-        # 2) Album art (URL)
+        # --- 2. Update Album Art (Spotipy URL Method) ---
+        
         album_art_url = info.get("album_art_url") if info else None
+        
+        
         if album_art_url:
             try:
                 headers = {'User-Agent': 'Mozilla/5.0'}
-                response = requests.get(album_art_url, headers=headers, stream=True, timeout=5)
+                response = requests.get(album_art_url, headers=headers, stream=True)
+                
                 if response.status_code != 200:
                     raise Exception(f"Failed to download image: {response.status_code}")
+
                 image_bytes = response.raw.read()
                 image_stream = io.BytesIO(image_bytes)
-                pil_img = Image.open(image_stream).resize((100, 100), Image.LANCZOS)
+                pil_img = Image.open(image_stream)
+                
+                # --- Resize to new 120x120 size ---
+                pil_img = pil_img.resize((120, 120), Image.LANCZOS)
+                
                 img_tk = ImageTk.PhotoImage(image=pil_img)
+                
                 self.album_art_label.config(image=img_tk)
-                self.album_art_label.image = img_tk
+                self.album_art_label.image = img_tk 
+                
             except Exception as e:
                 print(f"Error processing thumbnail URL: {e}")
                 self.album_art_label.config(image=self.placeholder_img)
                 self.album_art_label.image = self.placeholder_img
         else:
             self.album_art_label.config(image=self.placeholder_img)
-            self.album_art_label.image = self.placeholder_img
+            self.album_art_label.image = self.placeholder_img 
+
 
     # ---------- Helpers ----------
     def show_status(self, message, is_error=False):
