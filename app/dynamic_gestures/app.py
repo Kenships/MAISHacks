@@ -197,6 +197,10 @@ class MediaMusicController:
                 if len(self.controller.tracks) > 0:
                     for trk in self.controller.tracks:
                         if trk["tracker"].time_since_update < 1 and len(trk['hands']):
+                            gesture_id = trk['hands'][-1].gesture
+                            gesture_name = targets[gesture_id] if gesture_id is not None else None
+                            if gesture_name in ["part_hand_heart", "part_hand_heart2"]:
+                                self.handle_gesture_action(-1000,gesture_name)
                             if trk["hands"].action is not None:
                                 self.handle_gesture_action(trk["hands"].action)
                                 self.drawer.set_action(trk["hands"].action)
@@ -211,7 +215,8 @@ class MediaMusicController:
             self.cap.release()
         cv2.destroyAllWindows()
 
-    def handle_gesture_action(self, action):
+    def handle_gesture_action(self, action, gesture="None"):
+        print("gesture", gesture)
         if action in [Event.SWIPE_LEFT, Event.SWIPE_LEFT2, Event.SWIPE_LEFT3]:
             self.next_track()
         elif action in [Event.SWIPE_RIGHT, Event.SWIPE_RIGHT2, Event.SWIPE_RIGHT3]:
@@ -222,6 +227,8 @@ class MediaMusicController:
             self.volume_down()
         elif action == Event.TAP or action == Event.DOUBLE_TAP:
             self.play_pause()
+        elif gesture == "part_hand_heart" or  gesture == "part_hand_heart2":
+            self.media_info.like_current_song() 
 
     def show_status(self, message):
         self.status_label.config(text=message)
@@ -359,6 +366,8 @@ class MediaMusicController:
             #     return
         self.check_media_queue()
         self.root.after(10, self.update_camera_feed)  # Loop
+
+    # i
 
 def main():
     root = tk.Tk()
