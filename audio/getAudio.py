@@ -21,11 +21,11 @@ except:
         print("You need to enable 'Stereo Mix' in Windows Sound Settings")
         exit(1)
 
-with loopback.recorder(samplerate=44100) as recorder:
+with loopback.recorder(samplerate=48000) as recorder:
     print("Recording computer audio output... Press Ctrl+C to stop")
     try:
         while True:
-            data = recorder.record(numframes=1024)
+            data = recorder.record(numframes=2048)
             # print(len(data))
             # print(f"Audio level: {np.max(np.abs(data)):.4f}")
     except KeyboardInterrupt:

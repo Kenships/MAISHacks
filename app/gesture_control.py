@@ -3,6 +3,7 @@ import cv2
 import threading
 import time
 
+
 class GestureController:
     def __init__(self, callback):
         self.callback = callback
