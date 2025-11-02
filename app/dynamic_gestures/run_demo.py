@@ -40,7 +40,7 @@ def run(args):
                             2,
                         )
 
-                fps = 1.0 / (time.time() - start_time)
+                fps = 1.0 / 1e-8 +  (time.time() - start_time)
                 cv2.putText(frame, f"fps {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             if len(controller.tracks) > 0:
                 count_of_zoom = 0

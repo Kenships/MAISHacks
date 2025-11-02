@@ -19,7 +19,7 @@ class MediaInfo:
         if CLIENT_ID and CLIENT_SECRET and REDIRECT_URI:
             try:
                 # This scope is all we need to read the current song
-                scope = "user-read-currently-playing"
+                scope = "user-read-currently-playing user-library-modify user-library-read"
                 
                 # This is the user login flow.
                 # It will open a browser the first time.
@@ -65,6 +65,7 @@ class MediaInfo:
                 "artist": artist,
                 "album": item['album']['name'],
                 "album_art_url": album_art_url,
+                "track_id": item['id'],
                 # We add other fields as None to prevent crashes in the UI
                 "app_id": "spotify", 
                 "album_artist": None,
@@ -80,3 +81,28 @@ class MediaInfo:
         except Exception as e:
             print(f"Error in MediaInfo.get(): {e}")
             return None
+        
+    def like_current_song(self):
+        if not self.sp:
+            print("Spotify not intialized")
+            return False
+        
+        try:
+            current_track = self.sp.current_user_playing_track()
+            if not current_track or not current_track['item']:
+                print("No track is currently playing")
+                return False
+            track_id = current_track['item']['id']
+            if track_id:
+                if self.sp.current_user_saved_tracks_contains(tracks=[track_id])[0]:
+                    print(f"Track already liked: {current_track['item']['name']}")
+                    return True
+                
+                # Add to Liked Songs
+                self.sp.current_user_saved_tracks_add(tracks=[track_id])
+                print(f"Successfully liked track: {current_track['item']['name']}")
+                return True
+            
+        except Exception as e:
+            print(f"Error liking song: {e}")
+            return False
