@@ -1,5 +1,6 @@
 import soundcard as sc
 import numpy as np
+import customtkinter as ctk
 import tkinter as tk
 from tkinter import Canvas
 from PIL import Image, ImageTk
@@ -8,11 +9,19 @@ import warnings, time
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="soundcard")
 
 # =========================
-# Performance knobs
+# customtkinter setup
 # =========================
-CANVAS_SIZE    = 480   # output size you see
-INTERNAL_SIZE  = 320   # render size (lower = faster: 256–360)
-N_ANGLE        = 360   # total angles (must be even for mirroring)
+ctk.set_appearance_mode("dark")          # "light" | "dark" | "system"
+ctk.set_default_color_theme("dark-blue") # "blue" | "green" | "dark-blue"
+ctk.set_widget_scaling(1.0)
+ctk.set_window_scaling(1.0)
+
+# =========================
+# Performance knobs (your tweaked values kept)
+# =========================
+CANVAS_SIZE    = 480
+INTERNAL_SIZE  = 320
+N_ANGLE        = 360
 NUM_BANDS      = 16
 FFT_CHUNK      = 2048
 TARGET_FPS     = 90
@@ -31,15 +40,6 @@ except Exception:
 print(f"Recording from: {loopback.name}")
 
 # =========================
-# Tk window
-# =========================
-root = tk.Tk()
-root.title("Audio Reactive Gradient (Half+Mirror) • Bass-Only Pulse")
-root.configure(bg="black")
-canvas = Canvas(root, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="black", highlightthickness=0)
-canvas.pack(padx=10, pady=10)
-
-# =========================
 # Geometry (precompute)
 # =========================
 cx = cy = INTERNAL_SIZE // 2
@@ -49,8 +49,6 @@ R_MAX_ALLOWED = min(cx, cy) - FEATHER_PX - 1
 yy, xx = np.mgrid[0:INTERNAL_SIZE, 0:INTERNAL_SIZE]
 dx, dy = xx - cx, yy - cy
 rr = np.hypot(dx, dy)
-
-# Full-angle map for sampling the final (mirrored) arrays
 theta = (np.arctan2(dy, dx) + 2 * np.pi) % (2 * np.pi)
 angle_idx_map_full = (theta * (N_ANGLE / (2 * np.pi))).astype(np.int32)
 
@@ -102,7 +100,7 @@ def hue_lerp(h0, h1, t):
     return (h0 + t * d) % 1.0
 
 # =========================
-# Visual parameters (full saturation; vivid)
+# Visual parameters (from your version)
 # =========================
 HUE_BAND_SPREAD = 0.67
 HUE_AMP_WOBBLE  = 0.7
@@ -129,23 +127,22 @@ EXTRA_CLAMP = 2.0
 SAFETY = 0.03
 
 # --- Bass-only beat pulse (white center) ---
-PULSE_GAIN        = 0.6   # radius bump per *triggered* bass hit
-PULSE_DECAY       = 0.5   # decay between hits
-PULSE_STRENGTH    = 0.2   # radius growth on each hit
-RING_MARGIN_PX    = 14.0   # keep visible ring at peaks
+PULSE_GAIN        = 0.6
+PULSE_DECAY       = 0.5
+PULSE_STRENGTH    = 0.2
+RING_MARGIN_PX    = 14.0
 
 # Bass detection config
-BASS_MAX_HZ       = 160.0  # <= this is considered "bass" (try 160–220)
-BASS_WEIGHT_EXP   = 0.4   # weighting by (f/f_bass_max)^exp to favor sub-bass
-FLUX_HISTORY      = 90     # frames for adaptive stats (~1.8 s @50 FPS)
-FLUX_K_MAD        = 4.0    # threshold = median + K * MAD (robust)
-REFRACTORY_SEC    = 0.1   # minimum time between hits
-MIN_ACTIVITY      = 0.1   # ignore near-silence
+BASS_MAX_HZ       = 160.0
+BASS_WEIGHT_EXP   = 0.4
+FLUX_HISTORY      = 90
+FLUX_K_MAD        = 4.0
+REFRACTORY_SEC    = 0.1
+MIN_ACTIVITY      = 0.1
 
 # Precompute bass band mask & weights
 bass_band_mask = band_centers <= BASS_MAX_HZ
 if not np.any(bass_band_mask):
-    # ensure at least the lowest band counts as bass
     bass_band_mask[0] = True
 bass_centers_norm = np.clip(band_centers[bass_band_mask] / max(1e-6, BASS_MAX_HZ), 0.0, 1.0)
 bass_weights = (bass_centers_norm ** BASS_WEIGHT_EXP).astype(np.float32)
@@ -159,10 +156,7 @@ prev_lvls  = np.zeros(num_bands, dtype=np.float32)
 delta_ema  = np.zeros(num_bands, dtype=np.float32)
 loud_state = 0.0
 
-# Pulse & bass-beat detection
 pulse_state = 0.0
-white_oval_id = None
-
 prev_norm_for_flux_bass = None
 flux_prev2 = 0.0
 flux_prev1 = 0.0
@@ -171,19 +165,24 @@ flux_hist_count = 0
 flux_hist_idx = 0
 last_trigger_time = 0.0
 
-# Tk image handles (persist to avoid GC)
-tk_img = None
-img_id = None
+# Image and per-canvas handles
+tk_img = None  # keep a strong ref to avoid GC
+canvas_items = {}  # canvas -> {"img_id": int, "oval_id": int}
+
+# =========================
+# Multi-canvas helpers
+# =========================
+def register_canvas(cnv: Canvas):
+    """Register a canvas to receive frames."""
+    canvas_items[cnv] = {"img_id": None, "oval_id": None}
 
 # =========================
 # Core builders (compute HALF, then mirror)
 # =========================
 def build_from_audio(levels_01, delta_01, activity_01):
-    """Return (pal_full[N_ANGLE,3], deform_full[N_ANGLE]) built from half + mirror."""
     idx = np.arange(num_bands, dtype=np.float32)
     phi = 2.0 * np.pi * (idx / num_bands)
 
-    # Hue base from energy + change (purely audio)
     w1 = levels_01 + 1e-6
     z1 = np.sum(w1 * np.exp(1j * phi))
     hue_energy = (np.angle(z1) % (2 * np.pi)) / (2 * np.pi)
@@ -195,7 +194,6 @@ def build_from_audio(levels_01, delta_01, activity_01):
     hue_base = (1.0 - HUE_DELTA_BLEND) * hue_energy + HUE_DELTA_BLEND * hue_change
     hue_base %= 1.0
 
-    # Per-band hue (full saturation)
     band_h0 = (hue_base + HUE_BAND_SPREAD * (idx / max(1, num_bands - 1))) % 1.0
     band_h1 = (band_h0 + HUE_AMP_WOBBLE * levels_01) % 1.0
     band_h  = hue_lerp(band_h0, band_h1, levels_01)
@@ -203,21 +201,54 @@ def build_from_audio(levels_01, delta_01, activity_01):
     band_v  = np.clip(VAL_BASE + VAL_AMP_BOOST * activity_01 + VAL_BAND_BOOST * levels_01, 0.0, 1.0)
     band_rgb = hsv_to_rgb_numpy(band_h, band_s, band_v).astype(np.float32)
 
-    # Deformation with bass emphasis and rest pull
     wts = 1.0 / np.sqrt(1.0 + idx); wts /= wts.max(); wts[:3] *= BASS_EMPHASIS
     band_def = wts * (levels_01 - levels_01.mean())
     m = np.max(np.abs(band_def))
     if m > 1e-6: band_def /= m
     band_def *= (1.0 - REST_DEFORM_PULL * (1.0 - activity_01))
 
-    # Interpolate HALF angles (vectorized)
     pal_half = band_rgb[i0_half] * (1.0 - t_half[:, None]) + band_rgb[i1_half] * (t_half[:, None])
     def_half = band_def[i0_half] * (1.0 - t_half) + band_def[i1_half] * (t_half)
 
-    # Mirror to FULL
     pal_full = np.concatenate([pal_half, pal_half[::-1]], axis=0)
     def_full = np.concatenate([def_half, def_half[::-1]], axis=0)
     return pal_full.astype(np.uint8), def_full.astype(np.float32)
+
+# =========================
+# UI (customtkinter window + canvases)
+# =========================
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Audio Reactive Gradient (customtkinter) • Bass-Only Pulse")
+        self.configure(fg_color="black")
+        self.grid_columnconfigure((0, 1), weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Left frame
+        self.left = ctk.CTkFrame(self, corner_radius=16)
+        self.left.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
+        self.left.grid_columnconfigure(0, weight=1)
+        self.left.grid_rowconfigure(0, weight=1)
+
+        # # Right frame
+        # self.right = ctk.CTkFrame(self, corner_radius=16)
+        # self.right.grid(row=0, column=1, padx=12, pady=12, sticky="nsew")
+        # self.right.grid_columnconfigure(0, weight=1)
+        # self.right.grid_rowconfigure(0, weight=1)
+
+        # Put native tk.Canvas inside the CTkFrames (fastest drawing)
+        self.canvas1 = tk.Canvas(self.left, width=CANVAS_SIZE, height=CANVAS_SIZE,
+                                 bg="black", highlightthickness=0, bd=0, relief="flat")
+        self.canvas1.grid(row=0, column=0, padx=10, pady=10)
+
+        # self.canvas2 = tk.Canvas(self.right, width=CANVAS_SIZE, height=CANVAS_SIZE,
+        #                          bg="black", highlightthickness=0, bd=0, relief="flat")
+        # self.canvas2.grid(row=0, column=0, padx=10, pady=10)
+
+        # Register both canvases for rendering
+        register_canvas(self.canvas1)
+        # register_canvas(self.canvas2)
 
 # =========================
 # Audio loop (optimized)
@@ -225,15 +256,14 @@ def build_from_audio(levels_01, delta_01, activity_01):
 rec = loopback.recorder(samplerate=fs); rec.__enter__()
 TARGET_DT = 1.0 / TARGET_FPS
 
-def update_frame():
+def update_frame(app: App):
     global levels, prev_lvls, delta_ema, loud_state
-    global pulse_state, white_oval_id
-    global prev_norm_for_flux_bass, flux_prev2, flux_prev1, flux_hist, flux_hist_idx, flux_hist_count, last_trigger_time
-    global tk_img, img_id
+    global pulse_state, prev_norm_for_flux_bass, flux_prev2, flux_prev1
+    global flux_hist, flux_hist_idx, flux_hist_count, last_trigger_time
+    global tk_img
 
     t0 = time.perf_counter()
     try:
-        # Capture & FFT
         data = rec.record(numframes=chunk)
         data = data.mean(axis=1).astype(np.float32) if data.ndim > 1 else data.astype(np.float32)
 
@@ -243,26 +273,23 @@ def update_frame():
         band_sum = np.bincount(bin_band_valid, weights=mag_valid, minlength=num_bands).astype(np.float32)
         amps = band_sum / band_counts
 
-        # Normalize to [0,1] per band (robust)
         med = float(np.median(amps)) + 1e-8
         p90 = float(np.percentile(amps, 90)) + 1e-8
         norm = np.clip((amps - med) / (p90 - med), 0.0, 1.0)
 
-        # ---------- Bass-only spectral flux ----------
+        # Bass-only spectral flux
         bass_norm = norm[bass_band_mask]
         if prev_norm_for_flux_bass is None:
             flux_bass_now = 0.0
         else:
-            # positive changes in bass bands, weighted (favor sub-bass slightly)
             pos = np.clip(bass_norm - prev_norm_for_flux_bass, 0.0, 1.0)
             if bass_weights.shape[0] == pos.shape[0]:
                 flux_bass_now = float(np.sum(pos * bass_weights))
             else:
-                # fallback uniform if sizes mismatch
                 flux_bass_now = float(np.mean(pos))
         prev_norm_for_flux_bass = bass_norm.copy()
 
-        # Dual-time smoothing per band for visuals
+        # Band smoothing (visuals)
         rising = norm > levels
         levels = np.where(
             rising,
@@ -270,12 +297,10 @@ def update_frame():
             ALPHA_RELEASE * levels + (1 - ALPHA_RELEASE) * norm
         )
 
-        # Positive band delta (for hue motion)
         delta = np.clip(levels - prev_lvls, 0.0, 1.0)
         delta_ema = 0.70 * delta_ema + 0.30 * delta
         prev_lvls = levels.copy()
 
-        # Global loudness → activity (for colors/shape, not for pulse gating)
         loud_now = float(np.sqrt(np.mean(levels * levels)))
         if loud_now > loud_state:
             loud_state = ALPHA_LOUD_ATTACK  * loud_state + (1 - ALPHA_LOUD_ATTACK)  * loud_now
@@ -283,13 +308,8 @@ def update_frame():
             loud_state = ALPHA_LOUD_RELEASE * loud_state + (1 - ALPHA_LOUD_RELEASE) * loud_now
         activity = float(np.clip(loud_state, 0.0, 1.0))
 
-        # =========================
         # Strong bass-beat detection (adaptive, gated)
-        # Peak test on prev1; threshold = median + K*MAD from history; refractory + activity gate
-        # =========================
         now_time = time.perf_counter()
-
-        # Update history with prev1 (lag-1 peak test)
         if flux_hist_count < FLUX_HISTORY:
             flux_hist[flux_hist_idx] = flux_prev1
             flux_hist_count += 1
@@ -300,36 +320,31 @@ def update_frame():
         if flux_hist_count >= 10:
             med_flux = float(np.median(flux_hist[:flux_hist_count]))
             mad = float(np.median(np.abs(flux_hist[:flux_hist_count] - med_flux))) + 1e-9
-            thresh = med_flux + FLUX_K_MAD * (1.4826 * mad)  # robust sigma
+            thresh = med_flux + FLUX_K_MAD * (1.4826 * mad)
         else:
-            thresh = 1.0  # conservative during warmup
+            thresh = 1.0
 
         is_peak = (flux_prev1 > flux_prev2) and (flux_prev1 > flux_bass_now)
         strong_enough = (flux_prev1 > thresh)
         refractory_ok = (now_time - last_trigger_time) >= REFRACTORY_SEC
         active_enough = (activity >= MIN_ACTIVITY)
 
-        # Decay pulse every frame
         pulse_state *= PULSE_DECAY
-
         if is_peak and strong_enough and refractory_ok and active_enough:
             pulse_state += PULSE_GAIN
             last_trigger_time = now_time
 
-        # Rotate flux values for next frame
         flux_prev2, flux_prev1 = flux_prev1, flux_bass_now
 
-        # Build HALF + mirror to FULL for ring color/shape
+        # Build ring
         pal_full, deform_full = build_from_audio(levels, delta_ema, activity)
 
-        # Adaptive headroom (avoid clipping)
         max_def = float(np.max(np.abs(deform_full)))
         den = max(1e-6, 1.0 + DEFORM_SCALE * max_def)
         r_base_dyn = (R_MAX_ALLOWED * (1.0 - SAFETY)) / den
         r_per_angle = r_base_dyn * (1.0 + DEFORM_SCALE * deform_full)
-        r_per_angle = np.clip(r_per_angle, 0.0, R_MAX_ALLOWED - EXTRA_CLAMP)
+        r_per_angle = np.clip(r_per_angle, 0.0, R_MAX_ALLOWED - 2.0)
 
-        # Map to pixels
         r_map = r_per_angle[angle_idx_map_full]
         dist  = r_map - rr
         alpha = np.clip(dist / FEATHER_PX + 1.0, 0.0, 1.0)
@@ -338,44 +353,51 @@ def update_frame():
         color = pal_full[angle_idx_map_full]
         img_arr_small = (alpha[..., None] * color).astype(np.uint8)
 
-        # Upscale for display (persist image ref)
+        # Upscale for display (shared for all canvases)
         img = Image.fromarray(img_arr_small, "RGB").resize((CANVAS_SIZE, CANVAS_SIZE), Image.BILINEAR)
+        # keep strong ref so Tk doesn't garbage-collect it
+        global tk_img
         tk_img = ImageTk.PhotoImage(img)
-        if img_id is None:
-            img_id = canvas.create_image(CANVAS_SIZE//2, CANVAS_SIZE//2, image=tk_img)
-        else:
-            canvas.itemconfig(img_id, image=tk_img)
 
-        # --------- White center: only pulses on STRONG BASS beats ---------
+        # White center geometry
         r_inner_base_small = R_MAX_ALLOWED * INNER_RADIUS_RATIO
         r_inner_small = r_inner_base_small * (1.0 + PULSE_STRENGTH * min(1.0, pulse_state))
         r_inner_small = min(r_inner_small, R_MAX_ALLOWED - RING_MARGIN_PX)
-
         scale  = CANVAS_SIZE / INTERNAL_SIZE
         r_inner = r_inner_small * scale
-        cx_out = cy_out = CANVAS_SIZE // 2
-        coords = (cx_out - r_inner, cy_out - r_inner, cx_out + r_inner, cy_out + r_inner)
 
-        global white_oval_id
-        if white_oval_id is None:
-            white_oval_id = canvas.create_oval(*coords, fill="white", outline="")
-        else:
-            canvas.coords(white_oval_id, *coords)
-            canvas.tag_raise(white_oval_id)
-        # -------------------------------------------------------------
+        # Blit to all registered canvases
+        for cnv, ids in canvas_items.items():
+            if ids["img_id"] is None:
+                ids["img_id"] = cnv.create_image(CANVAS_SIZE//2, CANVAS_SIZE//2, image=tk_img)
+            else:
+                cnv.itemconfig(ids["img_id"], image=tk_img)
+
+            cx_out = cy_out = CANVAS_SIZE // 2
+            coords = (cx_out - r_inner, cy_out - r_inner, cx_out + r_inner, cy_out + r_inner)
+            if ids["oval_id"] is None:
+                ids["oval_id"] = cnv.create_oval(*coords, fill="white", outline="")
+            else:
+                cnv.coords(ids["oval_id"], *coords)
+                cnv.tag_raise(ids["oval_id"])
 
         # Frame pacing
         elapsed = time.perf_counter() - t0
-        delay_ms = max(1, int(1000 * max(0.0, TARGET_DT - elapsed)))
-        root.after(delay_ms, update_frame)
+        delay_ms = max(1, int(1000 * max(0.0, (1.0 / TARGET_FPS) - elapsed)))
+        app.after(delay_ms, lambda: update_frame(app))
 
     except Exception as e:
         print("Error:", e)
         try:
             rec.__exit__(None, None, None)
         finally:
-            root.quit()
+            app.destroy()
 
-update_frame()
-root.protocol("WM_DELETE_WINDOW", lambda: (rec.__exit__(None,None,None), root.destroy()))
-root.mainloop()
+# =========================
+# Run
+# =========================
+if __name__ == "__main__":
+    app = App()
+    update_frame(app)
+    app.protocol("WM_DELETE_WINDOW", lambda: (rec.__exit__(None, None, None), app.destroy()))
+    app.mainloop()
