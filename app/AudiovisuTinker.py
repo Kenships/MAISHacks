@@ -81,7 +81,7 @@ def update_bars():
         for i, (bar, amp) in enumerate(zip(bars, amplitudes)):
             x = i * bar_spacing + 5
             # Scale amplitude to canvas height (with some boost for visibility)
-            height = min(amp * canvas_height * 10, canvas_height)
+            height = min(amp * canvas_height * 2, canvas_height)
             y1 = canvas_height - height
             canvas.coords(bar, x, y1, x + bar_width, canvas_height)
         
