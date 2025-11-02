@@ -209,7 +209,7 @@ class MediaMusicController:
                                 2,
                             )
                     
-                    fps = 1.0 / (time.time() - start_time)
+                    fps = 1.0 / ((time.time() - start_time ) + 0.00001) # too prevent division by zero
                     cv2.putText(frame, f"fps {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 
                 # Process tracks and handle gestures
@@ -257,11 +257,11 @@ class MediaMusicController:
     def handle_gesture_action(self, action):
         """Map gesture actions to music controls"""
         if action in [Event.SWIPE_LEFT, Event.SWIPE_LEFT2, Event.SWIPE_LEFT3]:
-            print("Gesture: Swipe Left - Previous Track")
+            print("Gesture: Swipe Left - Next Track")
             self.next_track()
         
         elif action in [Event.SWIPE_RIGHT, Event.SWIPE_RIGHT2, Event.SWIPE_RIGHT3]:
-            print("Gesture: Swipe Right - Next Track")
+            print("Gesture: Swipe Right - Previous Track")
             self.previous_track()
         
         elif action in [Event.SWIPE_UP, Event.SWIPE_UP2, Event.SWIPE_UP3]:
