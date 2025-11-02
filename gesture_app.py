@@ -15,6 +15,9 @@ class HandGestureApp:
         self.root.geometry("800x700")
         self.root.configure(bg="#181818") # Dark background
 
+
+        self.pixel_img = tk.PhotoImage(width=1,height=1)
+
         # --- Camera State ---
         self.camera_on = False
         self.camera_visible = False
@@ -83,8 +86,16 @@ class HandGestureApp:
         self.controls_frame = tk.Frame(self.bottom_frame, bg="#282828")
         self.controls_frame.pack(pady=10)
 
-        button_config = {"font": ("Arial", 10), "width": 20, "height": 2,
-                         "fg": "white", "bd": 0, "cursor": "hand2"}
+        button_config = {
+            "font": ("Arial", 11, "bold"), # Slightly larger font
+            "fg": "white", 
+            "bd": 0, 
+            "cursor": "hand2",
+            "image": self.pixel_img,    # <-- Use the 1x1 pixel
+            "width": 180,               # <-- This is now PIXELS
+            "height": 35,               # <-- This is now PIXELS
+            "compound": "c"             # <-- Center the text over the image
+        }
 
         self.start_cam_btn = tk.Button(self.controls_frame,
                                            text="📷 Start Camera",
@@ -262,7 +273,9 @@ class HandGestureApp:
             self.artist_label.config(text="---")
 
         # --- 2. Update Album Art (Spotipy URL Method) ---
+        
         album_art_url = info.get("album_art_url") if info else None
+        print(album_art_url)
         
         if album_art_url:
             try:
