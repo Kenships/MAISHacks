@@ -311,7 +311,7 @@ class HandGestureApp:
             if info.get('is_liked'):
                 self.like_btn.config(text="❤️", fg="#1DB954", state=tk.DISABLED)
             else:
-                self.like_btn.config(text="♡", fg="white", state=tk.NORMAL)
+                self.like_btn.config(text="#", fg="white", state=tk.NORMAL)
                 
         else:
             self.song_title_label.config(text="No Media Playing")
