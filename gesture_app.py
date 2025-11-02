@@ -1,22 +1,24 @@
+# gesture_app.py
 import tkinter as tk
 import cv2
-from PIL import Image, ImageTk # We need ImageTk
+from PIL import Image, ImageTk, Image as PILImage
 import threading
 import queue
 import time
 import io
 import requests
+
 from media_info import MediaInfo
+from circle_visualizer import AudioRingVisualizer  # <-- import the module
 
 class HandGestureApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gesture Control Media Player")
         self.root.geometry("800x700")
-        self.root.configure(bg="#181818") # Dark background
+        self.root.configure(bg="#181818")
 
-
-        self.pixel_img = tk.PhotoImage(width=1,height=1)
+        self.pixel_img = tk.PhotoImage(width=1, height=1)
 
         # --- Camera State ---
         self.camera_on = False
@@ -31,111 +33,112 @@ class HandGestureApp:
         self.media_poll_thread = None
         self.polling_media = False
 
-        # --- Top Frame (for Camera) ---
-        self.camera_frame = tk.Frame(root, width=self.CAM_WIDTH, height=self.CAM_HEIGHT,
-                                      bg="black")
+        # --- Top frame (camera/visualizer container) ---
+        self.camera_frame = tk.Frame(self.root, width=self.CAM_WIDTH, height=self.CAM_HEIGHT, bg="#282828")
         self.camera_frame.pack(pady=20, padx=20)
         self.camera_frame.pack_propagate(False)
 
-        # --- Two-Label Fix ---
-        # Label for the video feed (initially hidden)
+        # Two-label approach for camera area
         self.camera_feed_label = tk.Label(self.camera_frame, bg="black")
-        
-        # Label for the placeholder text
         self.camera_placeholder_label = tk.Label(self.camera_frame, text="",
-                                                  font=("Arial", 12),
-                                                  bg="black", fg="white")
+                                                 font=("Arial", 12),
+                                                 bg="black", fg="white")
         self.camera_placeholder_label.pack(expand=True)
-        
         self.set_camera_placeholder("Press 'Start Camera' to begin")
 
-        # --- Bottom Frame (for Controls & Song Info) ---
-        self.bottom_frame = tk.Frame(root, bg="#282828", bd=1, relief="solid")
+        # --- Visualizer instance in the SAME area ---
+        viz_size = min(self.CAM_WIDTH, self.CAM_HEIGHT)
+        self.visualizer = AudioRingVisualizer(self.camera_frame, size=viz_size, fps=60)
+        # Initially hidden; will be shown when camera is off
+
+        # --- Bottom Frame (controls + song info) ---
+        self.bottom_frame = tk.Frame(self.root, bg="#282828", bd=1, relief="solid")
         self.bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, ipady=10, padx=10, pady=10)
 
-        # --- Create a main frame for media info (art + text) ---
         media_info_frame = tk.Frame(self.bottom_frame, bg="#282828")
         media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X)
 
-        # --- Create placeholder image ---
-        pil_placeholder = Image.new("RGB", (100, 100), color="#282828")
+        # Placeholder album art
+        pil_placeholder = PILImage.new("RGB", (100, 100), color="#282828")
         self.placeholder_img = ImageTk.PhotoImage(pil_placeholder)
 
-        # --- Album Art Label ---
         self.album_art_label = tk.Label(media_info_frame, image=self.placeholder_img,
-                                         bg="#282828", bd=0)
+                                        bg="#282828", bd=0)
         self.album_art_label.pack(side=tk.LEFT, padx=(0, 10))
-        self.album_art_label.image = self.placeholder_img # Anchor the placeholder
+        self.album_art_label.image = self.placeholder_img
 
-        # --- Frame for the text, to the right of the art ---
+        # Text info
         text_info_frame = tk.Frame(media_info_frame, bg="#282828")
         text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
-        # --- Song Info ---
         self.song_title_label = tk.Label(text_info_frame, text="No Song Playing",
-                                             font=("Arial", 16, "bold"), 
-                                             bg="#282828", fg="#ffffff", anchor="w")
+                                         font=("Arial", 16, "bold"),
+                                         bg="#282828", fg="#ffffff", anchor="w")
         self.song_title_label.pack(fill=tk.X)
 
         self.artist_label = tk.Label(text_info_frame, text="---",
-                                         font=("Arial", 12), 
-                                         bg="#282828", fg="#aaaaaa", anchor="w")
+                                     font=("Arial", 12),
+                                     bg="#282828", fg="#aaaaaa", anchor="w")
         self.artist_label.pack(fill=tk.X)
 
-        # --- Control Buttons ---
+        # Controls
         self.controls_frame = tk.Frame(self.bottom_frame, bg="#282828")
         self.controls_frame.pack(pady=10)
 
         button_config = {
-            "font": ("Arial", 11, "bold"), # Slightly larger font
-            "fg": "white", 
-            "bd": 0, 
+            "font": ("Arial", 11, "bold"),
+            "fg": "white",
+            "bd": 0,
             "cursor": "hand2",
-            "image": self.pixel_img,    # <-- Use the 1x1 pixel
-            "width": 180,               # <-- This is now PIXELS
-            "height": 35,               # <-- This is now PIXELS
-            "compound": "c"             # <-- Center the text over the image
+            "image": self.pixel_img,
+            "width": 180,
+            "height": 35,
+            "compound": "c",
         }
 
         self.start_cam_btn = tk.Button(self.controls_frame,
-                                           text="📷 Start Camera",
-                                           command=self.start_camera,
-                                           bg="#00aa00", activebackground="#008800", **button_config)
+                                       text="📷 Start Camera",
+                                       command=self.start_camera,
+                                       bg="#00aa00", activebackground="#008800", **button_config)
         self.start_cam_btn.grid(row=0, column=0, padx=5)
 
         self.stop_cam_btn = tk.Button(self.controls_frame,
-                                          text="⏹ Stop Camera",
-                                          command=self.stop_camera,
-                                          bg="#cc0000", activebackground="#aa0000", **button_config)
+                                      text="⏹ Stop Camera",
+                                      command=self.stop_camera,
+                                      bg="#cc0000", activebackground="#aa0000", **button_config)
 
         self.toggle_view_btn = tk.Button(self.controls_frame,
-                                             text="🙈 Hide Feed",
-                                             command=self.toggle_camera_view,
-                                             bg="#ff8c00", activebackground="#dd7700", **button_config)
+                                         text="🙈 Hide Feed",
+                                         command=self.toggle_camera_view,
+                                         bg="#ff8c00", activebackground="#dd7700", **button_config)
 
         self.simulate_btn = tk.Button(self.controls_frame,
-                                          text="✋ Simulate Gesture",
-                                          command=lambda: self.on_hand_symbol_detected("SIMULATED"),
-                                          bg="#5a0099", activebackground="#4a0088", **button_config)
+                                      text="✋ Simulate Gesture",
+                                      command=lambda: self.on_hand_symbol_detected("SIMULATED"),
+                                      bg="#5a0099", activebackground="#4a0088", **button_config)
         self.simulate_btn.grid(row=0, column=1, padx=5)
 
         self.status_label = tk.Label(self.bottom_frame, text="Ready",
-                                         font=("Arial", 10), 
-                                         bg="#282828", fg="#00ff00")
+                                     font=("Arial", 10),
+                                     bg="#282828", fg="#00ff00")
         self.status_label.pack(pady=(0, 10))
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    # ---------- Camera / Visualizer switching ----------
     def set_camera_placeholder(self, text):
-        """Shows the text label and hides the video label."""
-        self.camera_feed_label.pack_forget() # Hide video
+        self.camera_feed_label.pack_forget()
         self.camera_placeholder_label.config(text=text)
-        self.camera_placeholder_label.pack(expand=True) # Show text
-        
-    def start_camera(self):
-        if self.camera_on: return
+        self.camera_placeholder_label.pack(expand=True)
 
+    def start_camera(self):
+        if self.camera_on:
+            return
         try:
+            # Hide/stop visualizer while camera is live
+            self.visualizer.stop()
+            self.visualizer.hide()
+
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():
                 raise Exception("Cannot open webcam")
@@ -145,12 +148,13 @@ class HandGestureApp:
 
             self.camera_on = True
             self.camera_visible = True
-            
-            # Hide placeholder, show video label
+
+            # Show video label, hide placeholder
             self.camera_placeholder_label.pack_forget()
             self.camera_feed_label.pack(expand=True)
 
-            self.start_cam_btn.grid_forget() # Use grid_forget()
+            # Buttons
+            self.start_cam_btn.grid_forget()
             self.simulate_btn.grid(row=0, column=2, padx=5)
             self.stop_cam_btn.grid(row=0, column=0, padx=5)
             self.toggle_view_btn.grid(row=0, column=1, padx=5)
@@ -161,80 +165,95 @@ class HandGestureApp:
             self.start_media_polling()
 
         except Exception as e:
-            self.set_camera_placeholder(f"Error: {e}")
+            # If camera failed, fall back to visualizer
             self.show_status(f"Error: {e}", is_error=True)
+            self.camera_on = False
+            self.camera_visible = False
+            self.camera_feed_label.pack_forget()
+            self.camera_placeholder_label.pack_forget()
 
     def stop_camera(self):
+        # Close camera and switch to visualizer
         self.stop_media_polling()
         self.camera_on = False
         self.camera_visible = False
+
         if self.cap:
             self.cap.release()
             self.cap = None
 
+        # Buttons
         self.stop_cam_btn.grid_forget()
         self.toggle_view_btn.grid_forget()
         self.simulate_btn.grid(row=0, column=1, padx=5)
         self.start_cam_btn.grid(row=0, column=0, padx=5)
 
-        self.set_camera_placeholder("Camera feed stopped.")
-        self.show_status("Camera stopped.")
+        # Hide camera widgets
+        self.camera_feed_label.pack_forget()
+        self.camera_placeholder_label.pack_forget()
+
+        # Show & start visualizer here
+        self.visualizer.show()
+        self.visualizer.start()
+
+        self.show_status("Camera stopped. Visualizer active.")
         self.update_media_ui(None)
 
     def toggle_camera_view(self):
-        self.camera_visible = not self.camera_visible
+        # Only affects camera visibility while camera is ON.
+        if not self.camera_on:
+            return  # visualizer remains when camera is off
 
+        self.camera_visible = not self.camera_visible
         if self.camera_visible:
+            try:
+                self.visualizer.stop()
+                self.visualizer.hide()
+            except Exception:
+                pass
             self.toggle_view_btn.config(text="🙈 Hide Feed")
-            # Show video, hide text
             self.camera_placeholder_label.pack_forget()
             self.camera_feed_label.pack(expand=True)
         else:
+            self.visualizer.show()
+            self.visualizer.start()
             self.toggle_view_btn.config(text="🙉 Show Feed")
-            self.set_camera_placeholder("Feed hidden. Gestures are still active.")
+            # self.set_camera_placeholder("Feed hidden. Gestures are still active.")
+
 
     def update_camera_feed(self):
         if not self.camera_on:
             return
 
         self.check_media_queue()
-
         ret, frame = self.cap.read()
 
-        if ret:
-            # -----------------------------------------------------------------
-            # 🤖 AI INTEGRATION POINT 🤖
-            # -----------------------------------------------------------------
+        if ret and self.camera_visible:
+            frame_flipped = cv2.flip(frame, 1)
+            cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(cv_rgb)
+            img_tk = ImageTk.PhotoImage(image=pil_img)
+            self.camera_feed_label.config(image=img_tk, text="")
+            self.camera_feed_label.image = img_tk
 
-            if self.camera_visible:
-                frame_flipped = cv2.flip(frame, 1)
-                cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
-                
-                pil_img = Image.fromarray(cv_rgb)
-                # Use standard ImageTk.PhotoImage
-                img_tk = ImageTk.PhotoImage(image=pil_img)
+        self.root.after(10, self.update_camera_feed)
 
-                self.camera_feed_label.config(image=img_tk, text="")
-                self.camera_feed_label.image = img_tk # Anchor image
-
-        self.root.after(10, self.update_camera_feed)  # Loop
-
+    # ---------- Gestures / status ----------
     def on_hand_symbol_detected(self, gesture):
         self.show_status(f"Gesture Detected: {gesture}")
         self.artist_label.config(text=f"Last Gesture: {gesture}")
 
-    # --- Media Polling Functions (No changes) ---
-
+    # ---------- Media polling ----------
     def start_media_polling(self):
-        if self.polling_media: return
-        print("Starting media polling thread...")
+        if self.polling_media:
+            return
         self.polling_media = True
         self.media_poll_thread = threading.Thread(target=self._run_media_polling_loop, daemon=True)
         self.media_poll_thread.start()
 
     def stop_media_polling(self):
-        if not self.polling_media: return
-        print("Stopping media polling thread...")
+        if not self.polling_media:
+            return
         self.polling_media = False
         if self.media_poll_thread:
             self.media_poll_thread.join(timeout=1.0)
@@ -259,61 +278,54 @@ class HandGestureApp:
             pass
 
     def update_media_ui(self, info):
-        # --- 1. Update Text Labels ---
+        # 1) Text labels
         if info and info.get('title'):
             title = info.get('title', 'Unknown Title')
             artist = info.get('artist', 'Unknown Artist')
             if len(title) > 40:
                 title = title[:40] + "..."
-
             self.song_title_label.config(text=title)
             self.artist_label.config(text=artist)
         else:
             self.song_title_label.config(text="No Media Playing")
             self.artist_label.config(text="---")
 
-        # --- 2. Update Album Art (Spotipy URL Method) ---
-        
+        # 2) Album art (URL)
         album_art_url = info.get("album_art_url") if info else None
-        print(album_art_url)
-        
         if album_art_url:
             try:
                 headers = {'User-Agent': 'Mozilla/5.0'}
-                response = requests.get(album_art_url, headers=headers, stream=True)
-                
+                response = requests.get(album_art_url, headers=headers, stream=True, timeout=5)
                 if response.status_code != 200:
                     raise Exception(f"Failed to download image: {response.status_code}")
-
                 image_bytes = response.raw.read()
                 image_stream = io.BytesIO(image_bytes)
-                pil_img = Image.open(image_stream)
-                pil_img = pil_img.resize((100, 100), Image.LANCZOS)
-                
-                # Use standard ImageTk.PhotoImage
+                pil_img = Image.open(image_stream).resize((100, 100), Image.LANCZOS)
                 img_tk = ImageTk.PhotoImage(image=pil_img)
-                
                 self.album_art_label.config(image=img_tk)
-                self.album_art_label.image = img_tk # Anchor image
-                
+                self.album_art_label.image = img_tk
             except Exception as e:
                 print(f"Error processing thumbnail URL: {e}")
                 self.album_art_label.config(image=self.placeholder_img)
                 self.album_art_label.image = self.placeholder_img
         else:
             self.album_art_label.config(image=self.placeholder_img)
-            self.album_art_label.image = self.placeholder_img # Anchor placeholder
+            self.album_art_label.image = self.placeholder_img
 
-    # --- Helper functions ---
-
+    # ---------- Helpers ----------
     def show_status(self, message, is_error=False):
         color = "#ff0000" if is_error else "#00ff00"
         self.status_label.config(text=message, fg=color)
 
     def on_closing(self):
+        # Always clean up both camera and visualizer
+
         self.stop_media_polling()
         if self.camera_on:
-            self.stop_camera()
+            try:
+                self.cap.release()
+            except Exception:
+                pass
         self.root.destroy()
 
 
