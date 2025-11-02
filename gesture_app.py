@@ -7,7 +7,7 @@ import time
 import io
 import requests
 from media_info import MediaInfo
-from circle_visualizer import AudioRingVisualizer  # <-- This is your file
+from circle_visualizer import AudioRingVisualizer  # Your visualizer file
 
 class HandGestureApp:
     def __init__(self, root):
@@ -31,6 +31,10 @@ class HandGestureApp:
         self.media_poll_thread = None
         self.polling_media = False
         self.current_track_id = None 
+        
+        # --- FIX: Threading Lock for Polling ---
+        self.polling_enabled = threading.Event()  # This is the "pause button"
+        self.polling_enabled.set()                # Set to "on" by default
 
         # --- Top frame (camera/visualizer container) ---
         self.camera_frame = tk.Frame(self.root, width=self.CAM_WIDTH, height=self.CAM_HEIGHT, bg="black")
@@ -77,7 +81,7 @@ class HandGestureApp:
                                          bg="#282828", fg="#aaaaaa", anchor="w")
         self.artist_label.pack(fill=tk.X)
 
-        # --- UPDATED: Like Button ---
+        # --- Like Button ---
         self.like_btn = tk.Button(media_info_frame, text="♡", # Empty heart
                                   font=("Arial", 20),
                                   fg="white", bg="#282828",
@@ -85,11 +89,10 @@ class HandGestureApp:
                                   width=2, height=1, # Size in text units
                                   bd=0,
                                   relief=tk.FLAT, # Flat style
-                                  command=self.on_like_button_press,
+                                  command=self.on_like_button_press, # <-- Updated command
                                   state=tk.DISABLED) # Disabled by default
         self.like_btn.pack(side=tk.RIGHT, padx=5)
         
-        # --- NEW: Bind hover events ---
         self.like_btn.bind("<Enter>", self.on_like_enter)
         self.like_btn.bind("<Leave>", self.on_like_leave)
 
@@ -259,6 +262,7 @@ class HandGestureApp:
         if self.polling_media:
             return
         self.polling_media = True
+        self.polling_enabled.set() # Make sure polling is "unpaused"
         self.media_poll_thread = threading.Thread(target=self._run_media_polling_loop, daemon=True)
         self.media_poll_thread.start()
 
@@ -266,12 +270,16 @@ class HandGestureApp:
         if not self.polling_media:
             return
         self.polling_media = False
+        self.polling_enabled.set() # Un-pause if it was paused
         if self.media_poll_thread:
             self.media_poll_thread.join(timeout=1.0)
             self.media_poll_thread = None
 
     def _run_media_polling_loop(self):
         while self.polling_media:
+            # --- FIX: This line waits if the "pause" is set ---
+            self.polling_enabled.wait()
+            
             try:
                 info = self.media_info.get()
                 self.media_queue.put(info)
@@ -288,7 +296,6 @@ class HandGestureApp:
         except queue.Empty:
             pass
 
-    # --- THIS FUNCTION IS UPDATED ---
     def update_media_ui(self, info):
         # 1) Text labels
         if info and info.get('title'):
@@ -299,17 +306,17 @@ class HandGestureApp:
             self.song_title_label.config(text=title)
             self.artist_label.config(text=artist)
             
-            # --- NEW: Update Like button state ---
+            # --- Update Like button state ---
             self.current_track_id = info.get('track_id')
             if info.get('is_liked'):
-                self.like_btn.config(text="❤️", fg="#1DB954", state=tk.DISABLED) # Solid heart, green
+                self.like_btn.config(text="❤️", fg="#1DB954", state=tk.DISABLED)
             else:
-                self.like_btn.config(text="♡", fg="white", state=tk.NORMAL) # Empty heart, white
+                self.like_btn.config(text="♡", fg="white", state=tk.NORMAL)
                 
         else:
             self.song_title_label.config(text="No Media Playing")
             self.artist_label.config(text="---")
-            self.like_btn.config(text="♡", state=tk.DISABLED) # Disabled
+            self.like_btn.config(text="♡", state=tk.DISABLED)
             self.current_track_id = None
 
         # 2) Album Art
@@ -342,45 +349,47 @@ class HandGestureApp:
             self.album_art_label.config(image=self.placeholder_img)
             self.album_art_label.image = self.placeholder_img 
 
-    # --- THIS FUNCTION IS UPDATED ---
+    # --- FIX: Two-part "Like" function to prevent flicker ---
     def on_like_button_press(self):
-        """Called when the user clicks the 'Like' button. Disables the button and starts the worker."""
+        """Called when the user clicks the 'Like' button. Pauses polling and starts the worker."""
         if not self.current_track_id:
             self.show_status("No track to like!", is_error=True)
             return
             
-        self.show_status("Song added to playlist")
-        # Optimistically update UI to show it's liked and disable it
+        self.show_status("Liking song...")
+        # Optimistically update UI to show it's liked
         self.like_btn.config(state=tk.DISABLED, text="❤️", fg="#1DB954")
         
-        # Run the actual work in a new thread
+        # 1. "Press the pause button" on the main poller
+        self.polling_enabled.clear() 
+        
+        # 2. Run the actual work in a new thread
         worker_thread = threading.Thread(target=self._like_song_worker, daemon=True)
         worker_thread.start()
 
     def _like_song_worker(self):
         """
-        This runs in the background. It likes the song and then
-        immediately fetches the new media state to update the UI.
+        This runs in the background. It likes the song, forces a refresh,
+        and then "un-pauses" the main polling thread.
         """
-        # 1. Like the song
-        self.media_info.like_current_song()
-        
-        # 2. Force a re-poll
-        # Get the new info (which will now have "is_liked": True)
         try:
+            # 1. Like the song
+            self.media_info.like_current_song()
+            
+            # 2. Force a re-poll to get new "is_liked": True status
             new_info = self.media_info.get()
             
             # 3. Put the new, correct info on the queue
-            # The main UI loop will pick this up instantly.
-            self.media_queue.put(new_info)
+            if new_info:
+                self.media_queue.put(new_info)
             
         except Exception as e:
             print(f"Error re-fetching media info after like: {e}")
-
+        finally:
+            # 4. "Un-pause" the main polling thread
+            self.polling_enabled.set() 
 
     # ---------- Helpers ----------
-    
-    # --- NEW HOVER FUNCTIONS ---
     def on_like_enter(self, event):
         """Called when the mouse enters the like button."""
         if self.like_btn['state'] == tk.NORMAL:
