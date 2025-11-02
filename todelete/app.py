@@ -4,7 +4,7 @@ from pynput.keyboard import Key, Controller
 import numpy as np
 import cv2
 from PIL import Image, ImageTk
-from gesture_control import GestureController
+from gesture_control_sidney import GestureController
 from spotify_controller import auth_spotify, pause, playpause, next_track, previous_track, increase_volume, \
     decrease_volume
 
@@ -15,11 +15,12 @@ class YouTubeMusicController:
 
         self.root = root
         self.root.title("YouTube Music Controller with Gestures")
-        self.root.geometry("640x800")
+        self.root.geometry("400x400")  # Smaller window since no video canvas
         self.root.configure(bg="#282828")
         
         self.keyboard = Controller()
-        self.gesture_controller = GestureController(self.handle_gesture_callback)
+        # show_video=True to display with OpenCV
+        self.gesture_controller = GestureController(self.handle_gesture_callback, show_video=True)
         self.is_gesture_active = False
         
         # Title
@@ -31,19 +32,6 @@ class YouTubeMusicController:
             fg="#ffffff"
         )
         title.pack(pady=10)
-        
-        # Video feed canvas
-        self.video_frame = tk.Frame(root, bg="#000000")
-        self.video_frame.pack(pady=10)
-        
-        self.video_canvas = tk.Canvas(
-            self.video_frame,
-            width=640,
-            height=480,
-            bg="#000000",
-            highlightthickness=0
-        )
-        self.video_canvas.pack()
         
         # Gesture control button
         self.gesture_btn = tk.Button(
@@ -152,7 +140,7 @@ class YouTubeMusicController:
     def toggle_gesture_control(self):
         if not self.is_gesture_active:
             try:
-                self.gesture_controller.start()
+                self.gesture_controller.run()
                 self.is_gesture_active = True
                 self.gesture_btn.config(text="⏸ Stop Gesture Control", bg="#cc0000")
                 self.show_status("📷 Gesture control started")
@@ -162,35 +150,29 @@ class YouTubeMusicController:
             self.gesture_controller.stop()
             self.is_gesture_active = False
             self.gesture_btn.config(text="📷 Start Gesture Control", bg="#0066cc")
-            self.video_canvas.delete("all")
             self.show_status("⏸ Gesture control stopped")
     
     def handle_gesture_callback(self, callback_type, data, extra):
-        if callback_type == 'frame':
-            self.update_video_feed(data)
-        elif callback_type == 'gesture':
-            self.handle_gesture(data, extra)
+        """Handle callbacks from GestureController"""
+        # We don't need to handle 'frame' anymore since OpenCV displays it
+        if callback_type == 'gesture':
+            # data is the gesture name, extra is the hand object
+            self.handle_gesture(data)
+        elif callback_type == 'action':
+            # data is the action event
+            self.handle_action(data)
+        elif callback_type == 'combo':
+            # data is the combo name
+            self.handle_combo(data)
     
-    def update_video_feed(self, frame):
-        # Convert BGR to RGB
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # Resize to fit canvas
-        frame_resized = cv2.resize(frame_rgb, (640, 480))
-        
-        # Convert to PhotoImage
-        img = Image.fromarray(frame_resized)
-        imgtk = ImageTk.PhotoImage(image=img)
-        
-        # Update canvas
-        self.video_canvas.delete("all")
-        self.video_canvas.create_image(0, 0, anchor=tk.NW, image=imgtk)
-        self.video_canvas.image = imgtk  # Keep a reference
+    # Remove update_video_feed method - no longer needed
     
-    def handle_gesture(self, gesture_name, confidence):
-        print(gesture_name)
+    def handle_gesture(self, gesture_name):
+        """Handle individual gestures"""
+        # print(f"Gesture detected: {gesture_name}")
+        
+        # Map gesture names to actions
         if gesture_name == "Thumb_Up":
-            print("should pause")
             self.play_pause()
         elif gesture_name == "Victory":
             self.next_track()
@@ -199,42 +181,52 @@ class YouTubeMusicController:
         elif gesture_name == "Open_Palm":
             self.volume_up()
         
-        self.show_status(f"👋 Gesture: {gesture_name} ({confidence:.2f})")
+        self.show_status(f"👋 Gesture: {gesture_name}")
+    
+    def handle_action(self, action):
+        """Handle action events (swipes, taps, etc.)"""
+        print(f"Action detected: {action}")
+        self.show_status(f"🎬 Action: {action}")
+    
+    def handle_combo(self, combo_name):
+        """Handle combo gestures"""
+        print(f"Combo detected: {combo_name}")
+        self.show_status(f"🎯 Combo: {combo_name}")
     
     def show_status(self, message):
         self.status_label.config(text=message)
         self.root.after(2000, lambda: self.status_label.config(text="Ready"))
     
     def play_pause(self):
-        playpause(self.sp)
-        # self.keyboard.press(Key.media_play_pause)
-        # self.keyboard.release(Key.media_play_pause)
-        # print("press pause")
-        # self.show_status("⏯ Play/Pause toggled")
+        # playpause(self.sp)
+        self.keyboard.press(Key.media_play_pause)
+        self.keyboard.release(Key.media_play_pause)
+        print("press pause")
+        self.show_status("⏯ Play/Pause toggled")
     
     def next_track(self):
-        next_track(self.sp)
-        # self.keyboard.press(Key.media_next)
-        # self.keyboard.release(Key.media_next)
-        # self.show_status("⏭ Skipped to next track")
+        # next_track(self.sp)
+        self.keyboard.press(Key.media_next)
+        self.keyboard.release(Key.media_next)
+        self.show_status("⏭ Skipped to next track")
     
     def previous_track(self):
-        previous_track(self.sp)
-        # self.keyboard.press(Key.media_previous)
-        # self.keyboard.release(Key.media_previous)
-        # self.show_status("⏮ Previous track")
+        # previous_track(self.sp)
+        self.keyboard.press(Key.media_previous)
+        self.keyboard.release(Key.media_previous)
+        self.show_status("⏮ Previous track")
     
     def volume_up(self):
-        increase_volume(self.sp)
-        # self.keyboard.press(Key.media_volume_up)
-        # self.keyboard.release(Key.media_volume_up)
-        # self.show_status("🔊 Volume increased")
+        # increase_volume(self.sp)
+        self.keyboard.press(Key.media_volume_up)
+        self.keyboard.release(Key.media_volume_up)
+        self.show_status("🔊 Volume increased")
     
     def volume_down(self):
-        decrease_volume(self.sp)
-        # self.keyboard.press(Key.media_volume_down)
-        # self.keyboard.release(Key.media_volume_down)
-        # self.show_status("🔉 Volume decreased")
+        # decrease_volume(self.sp)
+        self.keyboard.press(Key.media_volume_down)
+        self.keyboard.release(Key.media_volume_down)
+        self.show_status("🔉 Volume decreased")
     
     def on_closing(self):
         if self.is_gesture_active:
