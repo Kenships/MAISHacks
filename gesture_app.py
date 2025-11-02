@@ -1,21 +1,18 @@
-# gesture_app.py
 import tkinter as tk
 import cv2
-from PIL import Image, ImageTk, Image as PILImage
+from PIL import Image, ImageTk
 import threading
 import queue
 import time
 import io
 import requests
-
 from media_info import MediaInfo
-from circle_visualizer import AudioRingVisualizer  # <-- import the module
+from circle_visualizer import AudioRingVisualizer  # <-- This is your file
 
 class HandGestureApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gesture Control Media Player")
-        # --- Smaller window to fit new elements ---
         self.root.geometry("800x700")
         self.root.configure(bg="#181818")
 
@@ -25,7 +22,6 @@ class HandGestureApp:
         self.camera_on = False
         self.camera_visible = False
         self.cap = None
-        # --- Smaller camera feed ---
         self.CAM_WIDTH = 640
         self.CAM_HEIGHT = 480
 
@@ -34,60 +30,74 @@ class HandGestureApp:
         self.media_queue = queue.Queue()
         self.media_poll_thread = None
         self.polling_media = False
+        self.current_track_id = None 
 
         # --- Top frame (camera/visualizer container) ---
-        self.camera_frame = tk.Frame(self.root, width=self.CAM_WIDTH, height=self.CAM_HEIGHT, bg="#282828")
+        self.camera_frame = tk.Frame(self.root, width=self.CAM_WIDTH, height=self.CAM_HEIGHT, bg="black")
         self.camera_frame.pack(pady=20, padx=20)
         self.camera_frame.pack_propagate(False)
 
         # --- Two-Label Fix ---
         self.camera_feed_label = tk.Label(self.camera_frame, bg="black")
         self.camera_placeholder_label = tk.Label(self.camera_frame, text="",
-                                                 font=("Arial", 12),
-                                                 bg="black", fg="white")
-        self.camera_placeholder_label.pack(expand=True)
-        self.set_camera_placeholder("Press 'Start Camera' to begin")
-
-        # --- Visualizer instance in the SAME area ---
+                                                  font=("Arial", 12),
+                                                  bg="black", fg="white")
+        
         viz_size = min(self.CAM_WIDTH, self.CAM_HEIGHT)
         self.visualizer = AudioRingVisualizer(self.camera_frame, size=viz_size, fps=60)
-        # Initially hidden; will be shown when camera is off
+        self.visualizer.hide() 
+
+        self.set_camera_placeholder("Press 'Start Camera' to begin")
 
         # --- Bottom Frame (controls + song info) ---
         self.bottom_frame = tk.Frame(self.root, bg="#282828", bd=1, relief="solid")
         self.bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, ipady=10, padx=10, pady=10)
 
         media_info_frame = tk.Frame(self.bottom_frame, bg="#282828")
-        media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X) # <-- Re-added fill=tk.X
+        media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X)
 
-        # --- Larger placeholder ---
         pil_placeholder = Image.new("RGB", (120, 120), color="#282828")
         self.placeholder_img = ImageTk.PhotoImage(pil_placeholder)
 
         self.album_art_label = tk.Label(media_info_frame, image=self.placeholder_img,
                                          bg="#282828", bd=0)
-        self.album_art_label.pack(side=tk.LEFT, padx=(0, 10)) # <-- Re-added side=tk.LEFT
-        self.album_art_label.image = self.placeholder_img # Anchor the placeholder
+        self.album_art_label.pack(side=tk.LEFT, padx=(0, 10))
+        self.album_art_label.image = self.placeholder_img
 
-        # Text info
         text_info_frame = tk.Frame(media_info_frame, bg="#282828")
-        text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5) # <-- Re-added side=tk.LEFT
+        text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
         self.song_title_label = tk.Label(text_info_frame, text="No Song Playing",
                                              font=("Arial", 16, "bold"), 
-                                             bg="#282828", fg="#ffffff", anchor="w") # <-- Re-added anchor="w"
-        self.song_title_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
+                                             bg="#282828", fg="#ffffff", anchor="w")
+        self.song_title_label.pack(fill=tk.X)
 
         self.artist_label = tk.Label(text_info_frame, text="---",
                                          font=("Arial", 12), 
-                                         bg="#282828", fg="#aaaaaa", anchor="w") # <-- Re-added anchor="w"
-        self.artist_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
+                                         bg="#282828", fg="#aaaaaa", anchor="w")
+        self.artist_label.pack(fill=tk.X)
+
+        # --- UPDATED: Like Button ---
+        self.like_btn = tk.Button(media_info_frame, text="♡", # Empty heart
+                                  font=("Arial", 20),
+                                  fg="white", bg="#282828",
+                                  activebackground="#1DB954", # Green click
+                                  width=2, height=1, # Size in text units
+                                  bd=0,
+                                  relief=tk.FLAT, # Flat style
+                                  command=self.on_like_button_press,
+                                  state=tk.DISABLED) # Disabled by default
+        self.like_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # --- NEW: Bind hover events ---
+        self.like_btn.bind("<Enter>", self.on_like_enter)
+        self.like_btn.bind("<Leave>", self.on_like_leave)
+
 
         # Controls
         self.controls_frame = tk.Frame(self.bottom_frame, bg="#282828")
         self.controls_frame.pack(pady=10)
 
-        # --- Bigger buttons/font ---
         button_config = {
             "font": ("Arial", 12, "bold"), 
             "fg": "white", 
@@ -100,37 +110,40 @@ class HandGestureApp:
         }
 
         self.start_cam_btn = tk.Button(self.controls_frame,
-                                       text="📷 Start Camera",
-                                       command=self.start_camera,
-                                       bg="#00aa00", activebackground="#008800", **button_config)
+                                           text="📷 Start Camera",
+                                           command=self.start_camera,
+                                           bg="#00aa00", activebackground="#008800", **button_config)
         self.start_cam_btn.grid(row=0, column=0, padx=5)
 
         self.stop_cam_btn = tk.Button(self.controls_frame,
-                                      text="⏹ Stop Camera",
-                                      command=self.stop_camera,
-                                      bg="#cc0000", activebackground="#aa0000", **button_config)
+                                          text="⏹ Stop Camera",
+                                          command=self.stop_camera,
+                                          bg="#cc0000", activebackground="#aa0000", **button_config)
 
         self.toggle_view_btn = tk.Button(self.controls_frame,
-                                         text="🙈 Hide Feed",
-                                         command=self.toggle_camera_view,
-                                         bg="#ff8c00", activebackground="#dd7700", **button_config)
+                                             text="🙈 Hide Feed",
+                                             command=self.toggle_camera_view,
+                                             bg="#ff8c00", activebackground="#dd7700", **button_config)
 
         self.simulate_btn = tk.Button(self.controls_frame,
-                                      text="✋ Simulate Gesture",
-                                      command=lambda: self.on_hand_symbol_detected("SIMULATED"),
-                                      bg="#5a0099", activebackground="#4a0088", **button_config)
+                                          text="✋ Simulate Gesture",
+                                          command=lambda: self.on_hand_symbol_detected("SIMULATED"),
+                                          bg="#5a0099", activebackground="#4a0088", **button_config)
         self.simulate_btn.grid(row=0, column=1, padx=5)
 
         self.status_label = tk.Label(self.bottom_frame, text="Ready",
-                                     font=("Arial", 10),
-                                     bg="#282828", fg="#00ff00")
+                                         font=("Arial", 10),
+                                         bg="#282828", fg="#00ff00")
         self.status_label.pack(pady=(0, 10))
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # ---------- Camera / Visualizer switching ----------
+    # ---------- Camera / Visualizer switching (FIXED) ----------
     def set_camera_placeholder(self, text):
+        """Shows the text label and hides ALL other widgets in the frame."""
+        self.visualizer.hide()
         self.camera_feed_label.pack_forget()
+        
         self.camera_placeholder_label.config(text=text)
         self.camera_placeholder_label.pack(expand=True)
 
@@ -138,9 +151,9 @@ class HandGestureApp:
         if self.camera_on:
             return
         try:
-            # Hide/stop visualizer while camera is live
             self.visualizer.stop()
             self.visualizer.hide()
+            self.camera_placeholder_label.pack_forget()
 
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():
@@ -152,7 +165,6 @@ class HandGestureApp:
             self.camera_on = True
             self.camera_visible = True
             
-            self.camera_placeholder_label.pack_forget()
             self.camera_feed_label.pack(expand=True)
 
             self.start_cam_btn.grid_forget() 
@@ -166,15 +178,15 @@ class HandGestureApp:
             self.start_media_polling()
 
         except Exception as e:
-            # If camera failed, fall back to visualizer
             self.show_status(f"Error: {e}", is_error=True)
             self.camera_on = False
             self.camera_visible = False
             self.camera_feed_label.pack_forget()
             self.camera_placeholder_label.pack_forget()
+            self.visualizer.show()
+            self.visualizer.start()
 
     def stop_camera(self):
-        # Close camera and switch to visualizer
         self.stop_media_polling()
         self.camera_on = False
         self.camera_visible = False
@@ -183,17 +195,14 @@ class HandGestureApp:
             self.cap.release()
             self.cap = None
 
-        # Buttons
         self.stop_cam_btn.grid_forget()
         self.toggle_view_btn.grid_forget()
         self.simulate_btn.grid(row=0, column=1, padx=5)
         self.start_cam_btn.grid(row=0, column=0, padx=5)
 
-        # Hide camera widgets
         self.camera_feed_label.pack_forget()
         self.camera_placeholder_label.pack_forget()
 
-        # Show & start visualizer here
         self.visualizer.show()
         self.visualizer.start()
 
@@ -201,9 +210,8 @@ class HandGestureApp:
         self.update_media_ui(None)
 
     def toggle_camera_view(self):
-        # Only affects camera visibility while camera is ON.
         if not self.camera_on:
-            return  # visualizer remains when camera is off
+            return 
 
         self.camera_visible = not self.camera_visible
         if self.camera_visible:
@@ -216,11 +224,12 @@ class HandGestureApp:
             self.camera_placeholder_label.pack_forget()
             self.camera_feed_label.pack(expand=True)
         else:
+            self.camera_feed_label.pack_forget()
+            self.camera_placeholder_label.pack_forget()
+            
             self.visualizer.show()
             self.visualizer.start()
             self.toggle_view_btn.config(text="🙉 Show Feed")
-            # self.set_camera_placeholder("Feed hidden. Gestures are still active.")
-
 
     def update_camera_feed(self):
         if not self.camera_on:
@@ -230,18 +239,16 @@ class HandGestureApp:
         ret, frame = self.cap.read()
 
         if ret and self.camera_visible:
-            if self.camera_visible:
-                # --- Resize frame to fit new CAM_WIDTH/HEIGHT ---
-                frame = cv2.resize(frame, (self.CAM_WIDTH, self.CAM_HEIGHT))
-                frame_flipped = cv2.flip(frame, 1)
-                cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
-                
-                pil_img = Image.fromarray(cv_rgb)
-                img_tk = ImageTk.PhotoImage(image=pil_img)
-                self.camera_feed_label.config(image=img_tk, text="")
-                self.camera_feed_label.image = img_tk 
+            frame = cv2.resize(frame, (self.CAM_WIDTH, self.CAM_HEIGHT))
+            frame_flipped = cv2.flip(frame, 1)
+            cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
+            
+            pil_img = Image.fromarray(cv_rgb)
+            img_tk = ImageTk.PhotoImage(image=pil_img)
+            self.camera_feed_label.config(image=img_tk, text="")
+            self.camera_feed_label.image = img_tk 
 
-        self.root.after(10, self.update_camera_feed)  # Loop
+        self.root.after(10, self.update_camera_feed)
 
     def on_hand_symbol_detected(self, gesture):
         self.show_status(f"Gesture Detected: {gesture}")
@@ -281,6 +288,7 @@ class HandGestureApp:
         except queue.Empty:
             pass
 
+    # --- THIS FUNCTION IS UPDATED ---
     def update_media_ui(self, info):
         # 1) Text labels
         if info and info.get('title'):
@@ -290,14 +298,22 @@ class HandGestureApp:
                 title = title[:40] + "..."
             self.song_title_label.config(text=title)
             self.artist_label.config(text=artist)
+            
+            # --- NEW: Update Like button state ---
+            self.current_track_id = info.get('track_id')
+            if info.get('is_liked'):
+                self.like_btn.config(text="❤️", fg="#1DB954", state=tk.DISABLED) # Solid heart, green
+            else:
+                self.like_btn.config(text="♡", fg="white", state=tk.NORMAL) # Empty heart, white
+                
         else:
             self.song_title_label.config(text="No Media Playing")
             self.artist_label.config(text="---")
+            self.like_btn.config(text="♡", state=tk.DISABLED) # Disabled
+            self.current_track_id = None
 
-        # --- 2. Update Album Art (Spotipy URL Method) ---
-        
+        # 2) Album Art
         album_art_url = info.get("album_art_url") if info else None
-        
         
         if album_art_url:
             try:
@@ -311,7 +327,6 @@ class HandGestureApp:
                 image_stream = io.BytesIO(image_bytes)
                 pil_img = Image.open(image_stream)
                 
-                # --- Resize to new 120x120 size ---
                 pil_img = pil_img.resize((120, 120), Image.LANCZOS)
                 
                 img_tk = ImageTk.PhotoImage(image=pil_img)
@@ -327,16 +342,65 @@ class HandGestureApp:
             self.album_art_label.config(image=self.placeholder_img)
             self.album_art_label.image = self.placeholder_img 
 
+    # --- THIS FUNCTION IS UPDATED ---
+    def on_like_button_press(self):
+        """Called when the user clicks the 'Like' button. Disables the button and starts the worker."""
+        if not self.current_track_id:
+            self.show_status("No track to like!", is_error=True)
+            return
+            
+        self.show_status("Song added to playlist")
+        # Optimistically update UI to show it's liked and disable it
+        self.like_btn.config(state=tk.DISABLED, text="❤️", fg="#1DB954")
+        
+        # Run the actual work in a new thread
+        worker_thread = threading.Thread(target=self._like_song_worker, daemon=True)
+        worker_thread.start()
+
+    def _like_song_worker(self):
+        """
+        This runs in the background. It likes the song and then
+        immediately fetches the new media state to update the UI.
+        """
+        # 1. Like the song
+        self.media_info.like_current_song()
+        
+        # 2. Force a re-poll
+        # Get the new info (which will now have "is_liked": True)
+        try:
+            new_info = self.media_info.get()
+            
+            # 3. Put the new, correct info on the queue
+            # The main UI loop will pick this up instantly.
+            self.media_queue.put(new_info)
+            
+        except Exception as e:
+            print(f"Error re-fetching media info after like: {e}")
+
 
     # ---------- Helpers ----------
+    
+    # --- NEW HOVER FUNCTIONS ---
+    def on_like_enter(self, event):
+        """Called when the mouse enters the like button."""
+        if self.like_btn['state'] == tk.NORMAL:
+            self.like_btn.config(bg="#404040") # Darker hover color
+
+    def on_like_leave(self, event):
+        """Called when the mouse leaves the like button."""
+        self.like_btn.config(bg="#282828") # Back to original color
+            
     def show_status(self, message, is_error=False):
         color = "#ff0000" if is_error else "#00ff00"
         self.status_label.config(text=message, fg=color)
 
     def on_closing(self):
-        # Always clean up both camera and visualizer
-
         self.stop_media_polling()
+        try:
+            self.visualizer.stop()
+        except Exception:
+            pass
+            
         if self.camera_on:
             try:
                 self.cap.release()
