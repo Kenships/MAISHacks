@@ -127,6 +127,18 @@ class AudioRingVisualizer:
         self.img_id = None
         self.white_oval_id = None
 
+        # Load Spotify logo
+        try:
+            logo = Image.open("SpotifyLogo.png").convert("RGBA")
+            self.logo_img = logo
+            self.tk_logo = None
+            self.logo_id = None
+        except Exception as e:
+            print("Failed to load Spotify logo:", e)
+            self.logo_img = None
+            self.tk_logo = None
+            self.logo_id = None
+
         # audio + loop
         self.rec = None
         self.running = False
@@ -313,11 +325,25 @@ class AudioRingVisualizer:
             cy_out = self.canvas_h // 2
             coords = (cx_out - r_inner, cy_out - r_inner, cx_out + r_inner, cy_out + r_inner)
 
-            if self.white_oval_id is None:
-                self.white_oval_id = self.canvas.create_oval(*coords, fill="white", outline="")
+            # Draw Spotify logo instead of white oval
+            if self.logo_img is not None:
+                # Scale logo to current pulse size
+                diameter = int(2 * r_inner)
+                logo_resized = self.logo_img.resize((diameter, diameter), Image.LANCZOS)
+                self.tk_logo = ImageTk.PhotoImage(logo_resized)
+                if self.logo_id is None:
+                    self.logo_id = self.canvas.create_image(cx_out, cy_out, image=self.tk_logo)
+                else:
+                    self.canvas.itemconfig(self.logo_id, image=self.tk_logo)
+                    self.canvas.coords(self.logo_id, cx_out, cy_out)
+                    self.canvas.tag_raise(self.logo_id)
             else:
-                self.canvas.coords(self.white_oval_id, *coords)
-                self.canvas.tag_raise(self.white_oval_id)
+                # fallback white circle
+                if self.white_oval_id is None:
+                    self.white_oval_id = self.canvas.create_oval(*coords, fill="white", outline="")
+                else:
+                    self.canvas.coords(self.white_oval_id, *coords)
+                    self.canvas.tag_raise(self.white_oval_id)
 
         except Exception as e:
             print("Visualizer error:", e)
