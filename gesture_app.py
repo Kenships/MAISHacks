@@ -12,8 +12,8 @@ class HandGestureApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gesture Control Media Player")
-        # --- CHANGED: Smaller window to fit new elements ---
-        self.root.geometry("700x650")
+        # --- Smaller window to fit new elements ---
+        self.root.geometry("800x700")
         self.root.configure(bg="#181818") # Dark background
 
 
@@ -23,9 +23,9 @@ class HandGestureApp:
         self.camera_on = False
         self.camera_visible = False
         self.cap = None
-        # --- CHANGED: Smaller camera feed ---
-        self.CAM_WIDTH = 512
-        self.CAM_HEIGHT = 384
+        # --- Smaller camera feed ---
+        self.CAM_WIDTH = 640
+        self.CAM_HEIGHT = 480
 
         # --- Media Info State ---
         self.media_info = MediaInfo()
@@ -54,38 +54,38 @@ class HandGestureApp:
 
         # --- Create a main frame for media info (art + text) ---
         media_info_frame = tk.Frame(self.bottom_frame, bg="#282828")
-        media_info_frame.pack(pady=(10, 0), padx=10) # Centered
+        media_info_frame.pack(pady=(10, 0), padx=10, fill=tk.X) # <-- Re-added fill=tk.X
 
-        # --- CHANGED: Larger placeholder ---
+        # --- Larger placeholder ---
         pil_placeholder = Image.new("RGB", (120, 120), color="#282828")
         self.placeholder_img = ImageTk.PhotoImage(pil_placeholder)
 
         # --- Album Art Label ---
         self.album_art_label = tk.Label(media_info_frame, image=self.placeholder_img,
                                          bg="#282828", bd=0)
-        self.album_art_label.pack(pady=(0, 5)) # Packed on top
+        self.album_art_label.pack(side=tk.LEFT, padx=(0, 10)) # <-- Re-added side=tk.LEFT
         self.album_art_label.image = self.placeholder_img # Anchor the placeholder
 
-        # --- Frame for the text (THIS IS THE LINE YOU MISSED) ---
+        # --- Frame for the text, to the right of the art ---
         text_info_frame = tk.Frame(media_info_frame, bg="#282828")
-        text_info_frame.pack() # Packed below the album art
+        text_info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5) # <-- Re-added side=tk.LEFT
 
         # --- Song Info ---
         self.song_title_label = tk.Label(text_info_frame, text="No Song Playing",
                                              font=("Arial", 16, "bold"), 
-                                             bg="#282828", fg="#ffffff")
-        self.song_title_label.pack() # Centered
+                                             bg="#282828", fg="#ffffff", anchor="w") # <-- Re-added anchor="w"
+        self.song_title_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
 
         self.artist_label = tk.Label(text_info_frame, text="---",
                                          font=("Arial", 12), 
-                                         bg="#282828", fg="#aaaaaa")
-        self.artist_label.pack() # Centered
+                                         bg="#282828", fg="#aaaaaa", anchor="w") # <-- Re-added anchor="w"
+        self.artist_label.pack(fill=tk.X) # <-- Re-added fill=tk.X
 
         # --- Control Buttons ---
         self.controls_frame = tk.Frame(self.bottom_frame, bg="#282828")
         self.controls_frame.pack(pady=10)
 
-        # --- CHANGED: Bigger buttons/font ---
+        # --- Bigger buttons/font ---
         button_config = {
             "font": ("Arial", 12, "bold"), 
             "fg": "white", 
@@ -286,7 +286,7 @@ class HandGestureApp:
                 image_stream = io.BytesIO(image_bytes)
                 pil_img = Image.open(image_stream)
                 
-                # --- CHANGED: Resize to new 120x120 size ---
+                # --- Resize to new 120x120 size ---
                 pil_img = pil_img.resize((120, 120), Image.LANCZOS)
                 
                 img_tk = ImageTk.PhotoImage(image=pil_img)
