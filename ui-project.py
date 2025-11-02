@@ -10,6 +10,7 @@ class HandGestureApp:
         self.root = root
         self.root.title("App GUI")
         self.root.geometry("500x600")
+ 
 
         title = tk.Label(text="AI Layout")
         title.pack()
