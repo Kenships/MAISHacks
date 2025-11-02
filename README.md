@@ -15,11 +15,11 @@ Getting the visualizer done, designing the UI, getting the camera to work and ca
 
 ## What we learned
 Spotify API, Python TkInter library, OpenCV, AI stuff, PyTorch, Windows SDK, Numpy, PyAudio
-We also learned to access the sound card of the computer and interact with hardware
+We also learned to interact with hardware by accessing the sound card and webcam of the computer
 
 
 ## What's next for MAISHacks
-Collecting our own data and fully doing the training ourselves, deliver the app in the form of a website or installer 
+Collecting our own data and fully doing the training ourselves from start to end and deliver the app in the form of a website or installer 
 
 Demo: https://drive.google.com/file/d/1Tk_j2XhFdSQyq7u8ZkqVTY8g6KN0smni/view
 ML model: https://github.com/ai-forever/dynamic_gestures
