@@ -1,24 +1,17 @@
+# gesture_app.py
 import tkinter as tk
-from tkinter import ttk
-from pynput.keyboard import Key, Controller
-import numpy as np
 import cv2
-import time
+from PIL import Image, ImageTk, Image as PILImage
 import threading
 import queue
-from PIL import Image, ImageTk
+import time
 import io
 import requests
 
-from main_controller import MainController
-from utils import Drawer, Event, targets
-import warnings
-from circle_visualizer import AudioRingVisualizer
-from media_info import MediaInfo
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="soundcard")
+from app.dynamic_gestures.media_info import MediaInfo
+from app.dynamic_gestures.circle_visualizer import AudioRingVisualizer  # <-- import the module
 
-
-class MediaMusicController:
+class HandGestureApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Gesture Control Media Player")
@@ -35,10 +28,6 @@ class MediaMusicController:
         # --- Smaller camera feed ---
         self.CAM_WIDTH = 640
         self.CAM_HEIGHT = 480
-        self.keyboard = Controller()
-        self.is_gesture_active = False
-        self.gesture_thread = None
-        self.stop_flag = False
 
         # --- Media Info State ---
         self.media_info = MediaInfo()
@@ -57,13 +46,11 @@ class MediaMusicController:
                                                  font=("Arial", 12),
                                                  bg="black", fg="white")
         self.camera_placeholder_label.pack(expand=True)
-        # self.set_camera_placeholder("Press 'Start Camera' to begin")
+        self.set_camera_placeholder("Press 'Start Camera' to begin")
 
         # --- Visualizer instance in the SAME area ---
         viz_size = min(self.CAM_WIDTH, self.CAM_HEIGHT)
         self.visualizer = AudioRingVisualizer(self.camera_frame, size=viz_size, fps=60)
-        self.visualizer.show()
-        self.visualizer.start()
         # Initially hidden; will be shown when camera is off
 
         # --- Bottom Frame (controls + song info) ---
@@ -112,28 +99,27 @@ class MediaMusicController:
             "compound": "c"
         }
 
-        self.gesture_btn = tk.Button(self.controls_frame,
+        self.start_cam_btn = tk.Button(self.controls_frame,
                                        text="📷 Start Camera",
-                                       command=self.toggle_gesture_control,
+                                       command=self.start_camera,
                                        bg="#00aa00", activebackground="#008800", **button_config)
-        self.gesture_btn.grid(row=0, column=0, padx=5)
-        self.update_camera_feed()
-        self.start_media_polling()
-        # self.stop_cam_btn = tk.Button(self.controls_frame,
-        #                               text="⏹ Stop Camera",
-        #                               command=self.stop_camera,
-        #                               bg="#cc0000", activebackground="#aa0000", **button_config)
+        self.start_cam_btn.grid(row=0, column=0, padx=5)
 
-        # self.toggle_view_btn = tk.Button(self.controls_frame,
-        #                                  text="🙈 Hide Feed",
-        #                                  command=self.toggle_camera_view,
-        #                                  bg="#ff8c00", activebackground="#dd7700", **button_config)
+        self.stop_cam_btn = tk.Button(self.controls_frame,
+                                      text="⏹ Stop Camera",
+                                      command=self.stop_camera,
+                                      bg="#cc0000", activebackground="#aa0000", **button_config)
 
-        # self.simulate_btn = tk.Button(self.controls_frame,
-        #                               text="✋ Simulate Gesture",
-        #                               command=lambda: self.on_hand_symbol_detected("SIMULATED"),
-        #                               bg="#5a0099", activebackground="#4a0088", **button_config)
-        # self.simulate_btn.grid(row=0, column=1, padx=5)
+        self.toggle_view_btn = tk.Button(self.controls_frame,
+                                         text="🙈 Hide Feed",
+                                         command=self.toggle_camera_view,
+                                         bg="#ff8c00", activebackground="#dd7700", **button_config)
+
+        self.simulate_btn = tk.Button(self.controls_frame,
+                                      text="✋ Simulate Gesture",
+                                      command=lambda: self.on_hand_symbol_detected("SIMULATED"),
+                                      bg="#5a0099", activebackground="#4a0088", **button_config)
+        self.simulate_btn.grid(row=0, column=1, padx=5)
 
         self.status_label = tk.Label(self.bottom_frame, text="Ready",
                                      font=("Arial", 10),
@@ -142,123 +128,124 @@ class MediaMusicController:
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # --- rest of your original methods unchanged ---
-    def toggle_gesture_control(self):
-        if not self.is_gesture_active:
-            self.start_gesture_control()
+    # ---------- Camera / Visualizer switching ----------
+    def set_camera_placeholder(self, text):
+        self.camera_feed_label.pack_forget()
+        self.camera_placeholder_label.config(text=text)
+        self.camera_placeholder_label.pack(expand=True)
+
+    def start_camera(self):
+        if self.camera_on:
+            return
+        try:
+            # Hide/stop visualizer while camera is live
+            self.visualizer.stop()
+            self.visualizer.hide()
+
+            self.cap = cv2.VideoCapture(0)
+            if not self.cap.isOpened():
+                raise Exception("Cannot open webcam")
+
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.CAM_WIDTH)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.CAM_HEIGHT)
+
+            self.camera_on = True
+            self.camera_visible = True
+            
+            self.camera_placeholder_label.pack_forget()
+            self.camera_feed_label.pack(expand=True)
+
+            self.start_cam_btn.grid_forget() 
+            self.simulate_btn.grid(row=0, column=2, padx=5)
+            self.stop_cam_btn.grid(row=0, column=0, padx=5)
+            self.toggle_view_btn.grid(row=0, column=1, padx=5)
+            self.toggle_view_btn.config(text="🙈 Hide Feed")
+
+            self.show_status("Camera started. Looking for gestures...")
+            self.update_camera_feed()
+            self.start_media_polling()
+
+        except Exception as e:
+            # If camera failed, fall back to visualizer
+            self.show_status(f"Error: {e}", is_error=True)
+            self.camera_on = False
+            self.camera_visible = False
+            self.camera_feed_label.pack_forget()
+            self.camera_placeholder_label.pack_forget()
+
+    def stop_camera(self):
+        # Close camera and switch to visualizer
+        self.stop_media_polling()
+        self.camera_on = False
+        self.camera_visible = False
+
+        if self.cap:
+            self.cap.release()
+            self.cap = None
+
+        # Buttons
+        self.stop_cam_btn.grid_forget()
+        self.toggle_view_btn.grid_forget()
+        self.simulate_btn.grid(row=0, column=1, padx=5)
+        self.start_cam_btn.grid(row=0, column=0, padx=5)
+
+        # Hide camera widgets
+        self.camera_feed_label.pack_forget()
+        self.camera_placeholder_label.pack_forget()
+
+        # Show & start visualizer here
+        self.visualizer.show()
+        self.visualizer.start()
+
+        self.show_status("Camera stopped. Visualizer active.")
+        self.update_media_ui(None)
+
+    def toggle_camera_view(self):
+        # Only affects camera visibility while camera is ON.
+        if not self.camera_on:
+            return  # visualizer remains when camera is off
+
+        self.camera_visible = not self.camera_visible
+        if self.camera_visible:
+            try:
+                self.visualizer.stop()
+                self.visualizer.hide()
+            except Exception:
+                pass
+            self.toggle_view_btn.config(text="🙈 Hide Feed")
+            self.camera_placeholder_label.pack_forget()
+            self.camera_feed_label.pack(expand=True)
         else:
-            self.stop_gesture_control()
-
-    def start_gesture_control(self):
-        self.is_gesture_active = True
-        self.stop_flag = False
-        self.gesture_btn.config(text="⏸ Stop Gesture Control", bg="#cc0000")
-        self.show_status("📷 Gesture control started")
+            self.visualizer.show()
+            self.visualizer.start()
+            self.toggle_view_btn.config(text="🙉 Show Feed")
+            # self.set_camera_placeholder("Feed hidden. Gestures are still active.")
 
 
-        self.gesture_thread = threading.Thread(target=self.run_gesture_recognition, daemon=True)
-        self.gesture_thread.start()
+    def update_camera_feed(self):
+        if not self.camera_on:
+            return
 
+        self.check_media_queue()
+        ret, frame = self.cap.read()
 
-    def stop_gesture_control(self):
-        self.stop_flag = True
-        self.is_gesture_active = False
-        if self.cap is not None:
-            self.cap.release()
-        cv2.destroyAllWindows()
-        self.gesture_btn.config(text="📷 Start Gesture Control", bg="#0066cc")
-        self.show_status("⏸ Gesture control stopped")
+        if ret and self.camera_visible:
+            if self.camera_visible:
+                # --- Resize frame to fit new CAM_WIDTH/HEIGHT ---
+                frame = cv2.resize(frame, (self.CAM_WIDTH, self.CAM_HEIGHT))
+                frame_flipped = cv2.flip(frame, 1)
+                cv_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
+                
+                pil_img = Image.fromarray(cv_rgb)
+                img_tk = ImageTk.PhotoImage(image=pil_img)
+                self.camera_feed_label.config(image=img_tk, text="")
+                self.camera_feed_label.image = img_tk 
 
-    def run_gesture_recognition(self):
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self.controller = MainController('models/hand_detector.onnx', 'models/crops_classifier.onnx')
-        self.drawer = Drawer()
-        debug_mode = True
-        while self.cap.isOpened() and not self.stop_flag:
-            ret, frame = self.cap.read()
-            frame = cv2.flip(frame, 1)
-            if ret:
-                start_time = time.time()
-                bboxes, ids, labels = self.controller(frame)
-                if debug_mode and bboxes is not None:
-                    bboxes = bboxes.astype(np.int32)
-                    for i in range(bboxes.shape[0]):
-                        box = bboxes[i, :]
-                        gesture = targets[labels[i]] if labels[i] is not None else "None"
-                        cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (255, 255, 0), 4)
-                        cv2.putText(frame, f"ID {ids[i]} : {gesture}",
-                                    (box[0], box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                                    1, (0, 0, 255), 2)
-                    fps = 1.0 / ((time.time() - start_time) + 0.00001)
-                    cv2.putText(frame, f"fps {fps:.2f}", (10, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                if len(self.controller.tracks) > 0:
-                    for trk in self.controller.tracks:
-                        if trk["tracker"].time_since_update < 1 and len(trk['hands']):
-                            gesture_id = trk['hands'][-1].gesture
-                            gesture_name = targets[gesture_id] if gesture_id is not None else None
-                            if gesture_name in ["part_hand_heart", "part_hand_heart2"]:
-                                self.handle_gesture_action(-1000,gesture_name)
-                            if trk["hands"].action is not None:
-                                self.handle_gesture_action(trk["hands"].action)
-                                self.drawer.set_action(trk["hands"].action)
-                                if trk["hands"].action not in [Event.DRAG, Event.DRAG2, Event.DRAG3]:
-                                    trk["hands"].action = None
-                frame = self.drawer.draw(frame)
-                cv2.imshow("Gesture Control", frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    self.stop_flag = True
-                    break
-        if self.cap is not None:
-            self.cap.release()
-        cv2.destroyAllWindows()
+        self.root.after(10, self.update_camera_feed)  # Loop
 
-    def handle_gesture_action(self, action, gesture="None"):
-        print("gesture", gesture)
-        if action in [Event.SWIPE_LEFT, Event.SWIPE_LEFT2, Event.SWIPE_LEFT3]:
-            self.next_track()
-        elif action in [Event.SWIPE_RIGHT, Event.SWIPE_RIGHT2, Event.SWIPE_RIGHT3]:
-            self.previous_track()
-        elif action in [Event.SWIPE_UP, Event.SWIPE_UP2, Event.SWIPE_UP3]:
-            self.volume_up()
-        elif action in [Event.SWIPE_DOWN, Event.SWIPE_DOWN2, Event.SWIPE_DOWN3]:
-            self.volume_down()
-        elif action == Event.TAP or action == Event.DOUBLE_TAP:
-            self.play_pause()
-        elif gesture == "part_hand_heart" or  gesture == "part_hand_heart2":
-            self.media_info.like_current_song() 
-
-    def show_status(self, message):
-        self.status_label.config(text=message)
-        self.root.after(2000, lambda: self.status_label.config(text="Ready"))
-
-    def play_pause(self):
-        self.keyboard.press(Key.media_play_pause)
-        self.keyboard.release(Key.media_play_pause)
-        self.show_status("⏯ Play/Pause toggled")
-
-    def next_track(self):
-        self.keyboard.press(Key.media_next)
-        self.keyboard.release(Key.media_next)
-        self.show_status("⏭ Skipped to next track")
-    def previous_track(self):
-        self.keyboard.press(Key.media_previous)
-        self.keyboard.release(Key.media_previous)
-        self.show_status("⏮ Previous track")
-    def volume_up(self):
-        self.keyboard.press(Key.media_volume_up)
-        self.keyboard.release(Key.media_volume_up)
-        self.show_status("🔊 Volume increased")
-    def volume_down(self):
-        self.keyboard.press(Key.media_volume_down)
-        self.keyboard.release(Key.media_volume_down)
-        self.show_status("🔉 Volume decreased")
-    def on_closing(self):
-        if self.is_gesture_active:
-            self.stop_gesture_control()
-        self.root.destroy()
+    def on_hand_symbol_detected(self, gesture):
+        self.show_status(f"Gesture Detected: {gesture}")
+        self.artist_label.config(text=f"Last Gesture: {gesture}")
 
     # ---------- Media polling ----------
     def start_media_polling(self):
@@ -357,19 +344,9 @@ class MediaMusicController:
                 pass
         self.root.destroy()
 
-    def update_camera_feed(self):
-            # if not self.camera_on:
-            #     return
-        self.check_media_queue()
-        self.root.after(10, self.update_camera_feed)  # Loop
-
-    # i
-
-def main():
-    root = tk.Tk()
-    app = MediaMusicController(root)
-    root.mainloop()
-
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = HandGestureApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_closing)
+    root.mainloop()
