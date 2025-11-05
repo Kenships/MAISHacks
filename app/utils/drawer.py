@@ -65,6 +65,8 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Next song", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
+
             elif self.action in [Event.SWIPE_RIGHT, Event.SWIPE_RIGHT2, Event.SWIPE_RIGHT3]:
                 frame = cv2.arrowedLine(
                     frame,
@@ -73,6 +75,7 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Previous song", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
             elif self.action in [Event.SWIPE_UP, Event.SWIPE_UP2, Event.SWIPE_UP3]:
                 frame = cv2.arrowedLine(
                     frame,
@@ -81,6 +84,7 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Volume Up", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
             elif self.action in [Event.SWIPE_DOWN, Event.SWIPE_DOWN2, Event.SWIPE_DOWN3]:
                 frame = cv2.arrowedLine(
                     frame,
@@ -89,6 +93,7 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Volume Down", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
 
             elif self.action == Event.FAST_SWIPE_DOWN:
                 frame = cv2.arrowedLine(
@@ -98,6 +103,8 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Volume Down", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
+
             elif self.action == Event.FAST_SWIPE_UP:
                 frame = cv2.arrowedLine(
                     frame,
@@ -106,48 +113,53 @@ class Drawer:
                     (0, 255, 0),
                     9,
                 )
+                frame = cv2.putText(frame, "Volume Up", org=(int(self.width * 0.5), (self.height + 6) // 2), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=3,color=(0, 255, 0), thickness=6, lineType=cv2.LINE_AA)
+
             elif self.action == Event.ZOOM_OUT:
-                center_x, center_y = self.width // 2, self.height // 2
-                square_size = 200
+                # center_x, center_y = self.width // 2, self.height // 2
+                # square_size = 200
 
-                top_left = (center_x - square_size // 2, center_y - square_size // 2)
-                top_right = (center_x + square_size // 2, center_y - square_size // 2)
-                bottom_left = (center_x - square_size // 2, center_y + square_size // 2)
-                bottom_right = (center_x + square_size // 2, center_y + square_size // 2)
-                cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
+                # top_left = (center_x - square_size // 2, center_y - square_size // 2)
+                # top_right = (center_x + square_size // 2, center_y - square_size // 2)
+                # bottom_left = (center_x - square_size // 2, center_y + square_size // 2)
+                # bottom_right = (center_x + square_size // 2, center_y + square_size // 2)
+                # cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
 
-                frame = cv2.arrowedLine(frame, top_left, (center_x - 20, center_y - 20), (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, top_right, (center_x + 20, center_y - 20), (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, bottom_left, (center_x - 20, center_y + 20), (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, bottom_right, (center_x + 20, center_y + 20), (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, top_left, (center_x - 20, center_y - 20), (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, top_right, (center_x + 20, center_y - 20), (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, bottom_left, (center_x - 20, center_y + 20), (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, bottom_right, (center_x + 20, center_y + 20), (0, 255, 0), 3)
+                pass
             elif self.action == Event.ZOOM_IN:
-                center_x, center_y = self.width // 2, self.height // 2
-                square_size = 200
-                arrow_length = 50
-                top_left = (center_x - square_size // 2, center_y - square_size // 2)
-                top_right = (center_x + square_size // 2, center_y - square_size // 2)
-                bottom_left = (center_x - square_size // 2, center_y + square_size // 2)
-                bottom_right = (center_x + square_size // 2, center_y + square_size // 2)
+                # center_x, center_y = self.width // 2, self.height // 2
+                # square_size = 200
+                # arrow_length = 50
+                # top_left = (center_x - square_size // 2, center_y - square_size // 2)
+                # top_right = (center_x + square_size // 2, center_y - square_size // 2)
+                # bottom_left = (center_x - square_size // 2, center_y + square_size // 2)
+                # bottom_right = (center_x + square_size // 2, center_y + square_size // 2)
 
-                cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
+                # cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
 
-                top_left_end = (top_left[0] - arrow_length, top_left[1] - arrow_length)
-                top_right_end = (top_right[0] + arrow_length, top_right[1] - arrow_length)
-                bottom_left_end = (bottom_left[0] - arrow_length, bottom_left[1] + arrow_length)
-                bottom_right_end = (bottom_right[0] + arrow_length, bottom_right[1] + arrow_length)
+                # top_left_end = (top_left[0] - arrow_length, top_left[1] - arrow_length)
+                # top_right_end = (top_right[0] + arrow_length, top_right[1] - arrow_length)
+                # bottom_left_end = (bottom_left[0] - arrow_length, bottom_left[1] + arrow_length)
+                # bottom_right_end = (bottom_right[0] + arrow_length, bottom_right[1] + arrow_length)
 
-                frame = cv2.arrowedLine(frame, top_left, top_left_end, (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, top_right, top_right_end, (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, bottom_left, bottom_left_end, (0, 255, 0), 3)
-                frame = cv2.arrowedLine(frame, bottom_right, bottom_right_end, (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, top_left, top_left_end, (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, top_right, top_right_end, (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, bottom_left, bottom_left_end, (0, 255, 0), 3)
+                # frame = cv2.arrowedLine(frame, bottom_right, bottom_right_end, (0, 255, 0), 3)
+                pass
 
             elif self.action in [Event.DRAG, Event.DRAG2, Event.DRAG3]:
-                frame = cv2.circle(frame, (self.width // 2, self.height // 2), 50, (0, 255, 0), 9)
+                # frame = cv2.circle(frame, (self.width // 2, self.height // 2), 50, (0, 255, 0), 9)
+                pass
             elif self.action == Event.DOUBLE_TAP:
-                frame = cv2.putText(frame, 'DOUBLE CLICK', (self.width // 2, self.height // 2), cv2.FONT_HERSHEY_SIMPLEX ,  
+                frame = cv2.putText(frame, 'START/STOP', (self.width // 2, self.height // 2), cv2.FONT_HERSHEY_SIMPLEX ,  
                    1, (255, 0, 0) , 5, cv2.LINE_AA) 
             elif self.action == Event.TAP:
-                frame = cv2.putText(frame, 'CLICK', (self.width // 2, self.height // 2), cv2.FONT_HERSHEY_SIMPLEX ,  
+                frame = cv2.putText(frame, 'START/STOP', (self.width // 2, self.height // 2), cv2.FONT_HERSHEY_SIMPLEX ,  
                    1, (255, 0, 0) , 5, cv2.LINE_AA) 
             elif self.action in [Event.DROP, Event.DROP2, Event.DROP3]:
                 frame = cv2.circle(frame, (self.width // 2, self.height // 2), 50, (0, 0, 255), -1)

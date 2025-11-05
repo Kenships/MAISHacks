@@ -212,8 +212,8 @@ class MediaMusicController:
             self.volume_down()
         elif action == Event.TAP or action == Event.DOUBLE_TAP:
             self.play_pause()
-        elif gesture == "part_hand_heart" or  gesture == "part_hand_heart2":
-            self.media_info.like_current_song() 
+        # elif gesture == "part_hand_heart" or  gesture == "part_hand_heart2":
+        #     self.media_info.like_current_song() 
 
     def show_status(self, message):
         self.status_label.config(text=message)
