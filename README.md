@@ -1,3 +1,6 @@
+## Award
+This is repo won second place at McGill AI Hackaton 2025
+
 ## Inspiration
 This project was the combination of our love for music and building something related to computer vision, so we took the best of both worlds and decided to make a project using Spotify. 
 
@@ -22,7 +25,7 @@ We also learned to interact with hardware by accessing the sound card and webcam
 Collecting our own data and fully doing the training ourselves from start to end and deliver the app in the form of a website or installer 
 
 Demo: https://drive.google.com/file/d/1Tk_j2XhFdSQyq7u8ZkqVTY8g6KN0smni/view
-
-ML model: https://github.com/ai-forever/dynamic_gestures
+Thank you to dynamic_gestures for the models
+CNN models: https://github.com/ai-forever/dynamic_gestures/tree/main/models
 
 Thank you all for collaborating on the project and we're all very excited to present it!
